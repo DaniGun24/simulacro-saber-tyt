@@ -176,7 +176,7 @@
     let items = detalle;
     if (filtro === 'correctas')   items = detalle.filter(d => d.correcta);
     if (filtro === 'incorrectas') items = detalle.filter(d => !d.correcta);
-    if (filtro === 'marcadas')    items = detalle.filter(d => marcadas.includes(d.id));
+    if (filtro === 'marcadas')    items = detalle.filter(d => d.marcada || marcadas.includes(d.id));
 
     document.getElementById('review-list').innerHTML = items.map(d => {
       const nivNombre = ['','Basico','Intermedio','Avanzado'][d.nivel] || '';

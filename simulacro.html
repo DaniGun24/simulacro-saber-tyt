@@ -151,8 +151,7 @@
 <script src="js/timer.js"></script>
 <script src="js/simulacro.js"></script>
 <script>
-  let configSimulacro = null;
-  let tiempoInicial   = 0;
+  let configSimulacro  = null;
   let reglasCuentaAtras = null;
 
   let gapiReady = false, gisReady = false;
@@ -166,51 +165,48 @@
   window.addEventListener('DOMContentLoaded', async () => {
     if (!verificarSesion()) return;
 
-    // Leer config guardada
     const rawConfig = localStorage.getItem('simulacro_config');
     if (!rawConfig) { window.location.href = 'configurar.html'; return; }
     configSimulacro = JSON.parse(rawConfig);
 
-    // Cargar banco
-    try {
-      await Banco.cargar();
-    } catch (e) {
-      alert('Error al cargar el banco de preguntas: ' + e.message);
+    try { await Banco.cargar(); }
+    catch (e) { alert('Error al cargar el banco de preguntas: ' + e.message); return; }
+
+    // Intentar restaurar sesion guardada en localStorage
+    const snap = Simulacro.restaurarLocal();
+    if (snap) {
+      // Regenerar preguntas con la misma config (misma semilla no disponible, pero restauramos respuestas)
+      const preguntas = Banco.seleccionarPreguntas(configSimulacro.modulos, configSimulacro.preguntasPorModulo);
+      await Simulacro.iniciar(configSimulacro, preguntas);
+      Simulacro.aplicarSnapshot(snap, preguntas);
+      // Ir directo al modulo/pregunta guardados sin mostrar reglas del modulo 0
+      iniciarTimerModulo(snap.tiempoRestanteModulo);
+      renderUI();
+      toast('Simulacro restaurado donde lo dejaste', 'success');
       return;
     }
 
-    // Verificar si hay sesion a continuar
-    const sesionId = localStorage.getItem('sesion_continuar');
-    if (sesionId) {
-      localStorage.removeItem('sesion_continuar');
-      // Por ahora iniciamos con nueva config (restauracion completa requiere Sheets autenticado)
-    }
-
-    // Seleccionar preguntas
+    // Sesion nueva
     const preguntas = Banco.seleccionarPreguntas(configSimulacro.modulos, configSimulacro.preguntasPorModulo);
-    const { totalSegundos } = Banco.calcularTiempo(configSimulacro.modulos, configSimulacro.preguntasPorModulo);
-    tiempoInicial = configSimulacro.modoPractica ? Infinity : totalSegundos;
-
-    await Simulacro.iniciar(configSimulacro, preguntas, totalSegundos);
-
-    // Mostrar reglas del primer modulo
+    await Simulacro.iniciar(configSimulacro, preguntas);
     mostrarReglas();
   });
 
   // ---- Reglas ----
   function mostrarReglas() {
+    clearInterval(reglasCuentaAtras);
     const mk = Simulacro.moduloActual();
     document.getElementById('rules-modulo-nombre').textContent = mk;
-    const reglas = REGLAS_MODULOS[mk] || [];
-    document.getElementById('rules-list').innerHTML = reglas.map(r => `<li>${r}</li>`).join('');
+    document.getElementById('rules-list').innerHTML =
+      (REGLAS_MODULOS[mk] || []).map(r => `<li>${r}</li>`).join('');
     document.getElementById('rules-screen').style.display = 'flex';
 
     let seg = 5;
-    document.getElementById('rules-countdown').textContent = `Avanzara automaticamente en ${seg}s`;
+    document.getElementById('rules-countdown').textContent = `Avanza automaticamente en ${seg}s`;
     reglasCuentaAtras = setInterval(() => {
       seg--;
       if (seg <= 0) { clearInterval(reglasCuentaAtras); cerrarReglas(); }
-      else document.getElementById('rules-countdown').textContent = `Avanzara automaticamente en ${seg}s`;
+      else document.getElementById('rules-countdown').textContent = `Avanza automaticamente en ${seg}s`;
     }, 1000);
   }
 
@@ -222,19 +218,25 @@
   }
 
   // ---- Timer ----
-  function iniciarTimerModulo() {
-    if (configSimulacro.modoPractica) { document.getElementById('timer-display').textContent = '∞'; return; }
-    const seg = Banco.calcularTiempoPorModulo(Simulacro.moduloActual(), configSimulacro.preguntasPorModulo);
+  function iniciarTimerModulo(segundosRestantes = null) {
+    if (configSimulacro.modoPractica) {
+      document.getElementById('timer-display').textContent = '∞ Practica';
+      return;
+    }
+    const seg = segundosRestantes !== null
+      ? segundosRestantes
+      : Banco.calcularTiempoPorModulo(Simulacro.moduloActual(), configSimulacro.preguntasPorModulo);
+
+    Simulacro.registrarInicioModulo(seg);
+
     Timer.iniciar(seg,
       (restantes, fmt) => {
         const el = document.getElementById('timer-display');
         el.textContent = fmt;
         el.className = 'timer-display' + (restantes <= 60 ? ' danger' : restantes <= 300 ? ' warning' : '');
+        Simulacro.guardarEstadoLocal();
       },
-      () => {
-        toast('Tiempo agotado para este modulo', 'error');
-        terminarModulo(true);
-      }
+      () => { toast('⏰ Tiempo agotado para este modulo', 'error'); terminarModulo(true); }
     );
   }
 
@@ -247,35 +249,30 @@
     const pq    = Simulacro.preguntaActual();
     if (!pq) return;
 
-    // Header
     document.getElementById('header-modulo').textContent = `Modulo ${est.moduloIdx + 1} de ${mods.length}: ${mk}`;
     document.getElementById('modulo-nombre').textContent = mk;
     document.getElementById('modulo-info').textContent   = `Pregunta ${est.preguntaIdx + 1} de ${pregs.length}`;
 
-    // Progreso modulo
     const pctMod = Math.round((est.preguntaIdx + 1) / pregs.length * 100);
     document.getElementById('prog-modulo-label').textContent = `Modulo ${est.moduloIdx + 1} de ${mods.length}`;
     document.getElementById('prog-modulo-pct').textContent   = pctMod + '%';
     document.getElementById('prog-modulo-fill').style.width  = pctMod + '%';
 
-    // Progreso total
     const respondidas = Simulacro.preguntasRespondidas();
     const total       = Simulacro.totalPreguntas();
-    const pctTot      = Math.round(respondidas / total * 100);
+    const pctTot      = total ? Math.round(respondidas / total * 100) : 0;
     document.getElementById('prog-total-pct').textContent  = pctTot + '%';
     document.getElementById('prog-total-fill').style.width = pctTot + '%';
 
-    // Pregunta
     document.getElementById('q-number').textContent = `Pregunta ${est.preguntaIdx + 1}`;
     const lvlEl = document.getElementById('q-level');
-    lvlEl.textContent = ['', 'Basico', 'Intermedio', 'Avanzado'][pq.nivel] || '';
-    lvlEl.className = `question-level level-${pq.nivel}`;
+    lvlEl.textContent = ['','Basico','Intermedio','Avanzado'][pq.nivel] || '';
+    lvlEl.className   = `question-level level-${pq.nivel}`;
     document.getElementById('q-text').textContent = pq.pregunta;
 
-    // Opciones
-    const letras = ['A','B','C','D'];
+    const letras       = ['A','B','C','D'];
     const respGuardada = est.respuestas[pq.id];
-    const mostrarResp = est.config.mostrarRespuesta && respGuardada !== undefined;
+    const mostrarResp  = est.config.mostrarRespuesta && respGuardada !== undefined;
     document.getElementById('options-list').innerHTML = pq.opciones.map((op, i) => {
       let cls = 'option-btn';
       if (mostrarResp) {
@@ -284,15 +281,11 @@
       } else if (i === respGuardada) {
         cls += ' selected';
       }
-      return `<li>
-        <button class="${cls}" onclick="seleccionarOpcion(${i})" data-idx="${i}">
-          <span class="option-letter">${letras[i]}</span>
-          <span>${op}</span>
-        </button>
-      </li>`;
+      return `<li><button class="${cls}" onclick="seleccionarOpcion(${i})">
+        <span class="option-letter">${letras[i]}</span><span>${op}</span>
+      </button></li>`;
     }).join('');
 
-    // Explicacion (modo practica)
     if (est.config.modoPractica && respGuardada !== undefined) {
       document.getElementById('explanation-box').classList.remove('hidden');
       document.getElementById('explanation-text').textContent = pq.explicacion || '';
@@ -300,39 +293,28 @@
       document.getElementById('explanation-box').classList.add('hidden');
     }
 
-    // Botones nav
     document.getElementById('btn-anterior').disabled  = est.preguntaIdx === 0;
     document.getElementById('btn-siguiente').disabled = est.preguntaIdx === pregs.length - 1;
-    const marcado = est.marcadas.has(pq.id);
-    document.getElementById('btn-marcar').style.color = marcado ? 'var(--warning)' : '';
+    document.getElementById('btn-marcar').style.color = est.marcadas.has(pq.id) ? 'var(--warning)' : '';
 
-    // Sidebar
     renderSidebar();
   }
 
   function renderSidebar() {
     const est  = Simulacro.estado;
-    const mods = est.config.modulos;
-
-    // Lista modulos
-    document.getElementById('module-list').innerHTML = mods.map((mk, i) => {
-      const done = i < est.moduloIdx;
-      const curr = i === est.moduloIdx;
-      return `<li class="module-item ${done ? 'completed' : curr ? 'active' : 'pending'}">
-        <span class="module-icon">${done ? '✅' : curr ? '▶' : '○'}</span>
-        <span>${mk}</span>
-      </li>`;
+    document.getElementById('module-list').innerHTML = est.config.modulos.map((mk, i) => {
+      const done = i < est.moduloIdx, curr = i === est.moduloIdx;
+      return `<li class="module-item ${done?'completed':curr?'active':'pending'}">
+        <span class="module-icon">${done?'✅':curr?'▶':'○'}</span><span>${mk}</span></li>`;
     }).join('');
 
-    // Mapa preguntas
-    const pregs = Simulacro.preguntasModulo();
-    document.getElementById('question-map').innerHTML = pregs.map((p, i) => {
-      const respondida = est.respuestas[p.id] !== undefined;
-      const marcada    = est.marcadas.has(p.id);
-      const actual     = i === est.preguntaIdx;
-      let cls = 'q-btn ' + (marcada ? 'flagged' : respondida ? 'answered' : 'unanswered');
-      if (actual) cls += ' current';
-      return `<button class="${cls}" onclick="irAPregunta(${i})" title="Pregunta ${i+1}">${i+1}</button>`;
+    document.getElementById('question-map').innerHTML = Simulacro.preguntasModulo().map((p, i) => {
+      const resp = est.respuestas[p.id] !== undefined;
+      const marc = est.marcadas.has(p.id);
+      const curr = i === est.preguntaIdx;
+      let cls = 'q-btn ' + (marc ? 'flagged' : resp ? 'answered' : 'unanswered');
+      if (curr) cls += ' current';
+      return `<button class="${cls}" onclick="irAPregunta(${i})" title="P${i+1}">${i+1}</button>`;
     }).join('');
   }
 
@@ -346,7 +328,7 @@
 
   function navegarAnterior() { Simulacro.anteriorPregunta(); renderUI(); }
   function navegarSiguiente() { Simulacro.siguientePregunta(); renderUI(); }
-  function irAPregunta(idx) { Simulacro.irAPregunta(idx); renderUI(); }
+  function irAPregunta(idx)   { Simulacro.irAPregunta(idx);   renderUI(); }
 
   function accionMarcar() {
     const pq = Simulacro.preguntaActual();
@@ -355,12 +337,13 @@
 
   function accionPausar() {
     Simulacro.pausar();
-    const est = Simulacro.estado;
-    const restantes = Timer.obtenerRestantes();
-    document.getElementById('pause-tiempo').textContent      = Timer.formatear(restantes);
-    document.getElementById('pause-respondidas').textContent = Simulacro.preguntasRespondidas();
-    document.getElementById('pause-total').textContent       = Simulacro.totalPreguntas();
-    document.getElementById('pause-avance').textContent      = Math.round(Simulacro.preguntasRespondidas() / Simulacro.totalPreguntas() * 100) + '%';
+    const restantes   = Timer.obtenerRestantes();
+    const respondidas = Simulacro.preguntasRespondidas();
+    const total       = Simulacro.totalPreguntas();
+    document.getElementById('pause-tiempo').textContent      = configSimulacro.modoPractica ? '∞' : Timer.formatear(restantes);
+    document.getElementById('pause-respondidas').textContent = respondidas;
+    document.getElementById('pause-total').textContent       = total;
+    document.getElementById('pause-avance').textContent      = total ? Math.round(respondidas / total * 100) + '%' : '0%';
     document.getElementById('pause-screen').classList.remove('hidden');
   }
 
@@ -370,13 +353,12 @@
   }
 
   function confirmarTerminarModulo() {
-    const pregs = Simulacro.preguntasModulo();
-    const est   = Simulacro.estado;
+    const pregs   = Simulacro.preguntasModulo();
+    const est     = Simulacro.estado;
     const sinResp = pregs.filter(p => est.respuestas[p.id] === undefined).length;
-    const msg = sinResp > 0
-      ? `Tienes ${sinResp} pregunta(s) sin responder en este modulo. ¿Deseas terminar de todas formas?`
-      : '¿Estas seguro de que deseas terminar este modulo?';
-    document.getElementById('modal-terminar-msg').textContent = msg;
+    document.getElementById('modal-terminar-msg').textContent = sinResp > 0
+      ? `Tienes ${sinResp} pregunta(s) sin responder. ¿Terminar de todas formas?`
+      : '¿Confirmas que deseas terminar este modulo?';
     document.getElementById('modal-terminar').classList.remove('hidden');
   }
 
@@ -386,6 +368,7 @@
 
   async function terminarModulo(porTiempo = false) {
     cerrarModalTerminar();
+    Simulacro.acumularTiempoModulo(); // registrar tiempo usado en este modulo
     Timer.detener();
     const hayMas = Simulacro.siguienteModulo();
     if (hayMas) {
@@ -396,16 +379,22 @@
   }
 
   async function finalizarSimulacro() {
-    const tiempoUsado = tiempoInicial - Timer.obtenerRestantes();
+    // Mostrar spinner mientras se guarda
+    document.getElementById('sim-main').innerHTML =
+      `<div style="display:flex;flex-direction:column;align-items:center;gap:1rem;padding:4rem">
+        <div class="spinner"></div>
+        <p>Guardando resultados…</p>
+      </div>`;
     try { await Sheets.autenticar(); } catch(_) {}
-    const resultado = await Simulacro.finalizarYGuardar(tiempoUsado);
-    window.location.href = `resultados.html?nuevo=1`;
+    await Simulacro.finalizarYGuardar();
+    window.location.href = 'resultados.html';
   }
 
   function abandonarSimulacro() {
-    if (confirm('¿Abandonar el simulacro? Perderás el progreso de este intento.')) {
+    if (confirm('¿Abandonar el simulacro? Se perdera el progreso de este intento.')) {
       Timer.detener();
       localStorage.removeItem('simulacro_estado');
+      localStorage.removeItem('simulacro_marcadas');
       window.location.href = 'dashboard.html';
     }
   }
@@ -423,7 +412,7 @@
     setTimeout(() => t.remove(), 3500);
   }
 
-  // Teclado: izq/der para navegar, Enter para seleccionar opcion focalizada
+  // Teclado: flechas para navegar
   document.addEventListener('keydown', e => {
     if (document.getElementById('pause-screen').classList.contains('hidden') === false) return;
     if (e.key === 'ArrowLeft')  navegarAnterior();
