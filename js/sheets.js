@@ -2,6 +2,8 @@
    sheets.js — Google Sheets API (GIS + GAPI)
    ========================================================= */
 
+const TOKEN_SK = 'gsheets_tok'; // sessionStorage key
+
 const Sheets = (() => {
   let tokenClient = null;
   let gapiInited   = false;
@@ -18,6 +20,12 @@ const Sheets = (() => {
             apiKey:        CONFIG.API_KEY,
             discoveryDocs: [CONFIG.DISCOVERY_DOC],
           });
+          // Restaurar token guardado si aun es valido
+          const stored = _tokenGuardado();
+          if (stored) {
+            gapi.client.setToken({ access_token: stored.access_token });
+            accessToken = stored.access_token;
+          }
           gapiInited = true;
           resolve();
         } catch (e) {
@@ -46,20 +54,48 @@ const Sheets = (() => {
     await Promise.all([initGAPI(), initGIS()]);
   }
 
-  // Solicitar token OAuth2 (abre popup de Google)
+  function _tokenGuardado() {
+    try {
+      const raw = sessionStorage.getItem(TOKEN_SK);
+      if (!raw) return null;
+      const t = JSON.parse(raw);
+      if (t.expires_at && Date.now() < t.expires_at) return t;
+      sessionStorage.removeItem(TOKEN_SK);
+      return null;
+    } catch { return null; }
+  }
+
+  function _guardarToken(resp) {
+    const t = {
+      access_token: resp.access_token,
+      expires_at:   Date.now() + ((resp.expires_in || 3600) * 1000) - 60000,
+    };
+    sessionStorage.setItem(TOKEN_SK, JSON.stringify(t));
+    accessToken = t.access_token;
+    gapi.client.setToken({ access_token: t.access_token });
+  }
+
+  // Solicitar token OAuth2 — reutiliza el guardado si sigue vigente
   async function autenticar() {
+    // Si ya hay token valido en sesion, no pedir de nuevo
+    const stored = _tokenGuardado();
+    if (stored) {
+      accessToken = stored.access_token;
+      gapi.client.setToken({ access_token: stored.access_token });
+      return stored.access_token;
+    }
+
     return new Promise((resolve, reject) => {
       if (!gapiInited || !gisInited) { reject(new Error('GAPI no inicializado')); return; }
       tokenClient.callback = resp => {
         if (resp.error) { reject(new Error(resp.error)); return; }
-        accessToken = resp.access_token;
-        resolve(accessToken);
+        _guardarToken(resp);
+        resolve(resp.access_token);
       };
-      if (gapi.client.getToken() === null) {
-        tokenClient.requestAccessToken({ prompt: 'consent' });
-      } else {
-        tokenClient.requestAccessToken({ prompt: '' });
-      }
+      // prompt:'select_account' solo la primera vez; despues silencioso
+      const yaAutorizado = !!sessionStorage.getItem('gsheets_authorized');
+      tokenClient.requestAccessToken({ prompt: yaAutorizado ? '' : 'consent' });
+      sessionStorage.setItem('gsheets_authorized', '1');
     });
   }
 
