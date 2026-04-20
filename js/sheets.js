@@ -11,14 +11,18 @@ const Sheets = (() => {
   // ---------- Inicializacion ----------
 
   async function initGAPI() {
-    return new Promise(resolve => {
+    return new Promise((resolve, reject) => {
       gapi.load('client', async () => {
-        await gapi.client.init({
-          apiKey:        CONFIG.API_KEY,
-          discoveryDocs: [CONFIG.DISCOVERY_DOC],
-        });
-        gapiInited = true;
-        resolve();
+        try {
+          await gapi.client.init({
+            apiKey:        CONFIG.API_KEY,
+            discoveryDocs: [CONFIG.DISCOVERY_DOC],
+          });
+          gapiInited = true;
+          resolve();
+        } catch (e) {
+          reject(e);
+        }
       });
     });
   }
