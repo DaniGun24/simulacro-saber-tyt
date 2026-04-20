@@ -217,44 +217,88 @@
     if (!resultadoActual) return;
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
-    const r = resultadoActual;
-    const u = obtenerUsuarioActual();
+    const r   = resultadoActual;
+    const u   = obtenerUsuarioActual();
+    const mids = ['LC','RQ','CE','CC','IN','TE'];
 
-    doc.setFontSize(20); doc.setFont(undefined,'bold');
-    doc.text('Simulacro Saber TyT — Resultados', 20, 25);
+    const addPage = () => { doc.addPage(); return 20; };
+    const checkY  = (y, extra = 10) => y > 270 - extra ? addPage() : y;
 
+    // --- Portada ---
+    doc.setFillColor(26, 86, 219);
+    doc.rect(0, 0, 210, 45, 'F');
+    doc.setTextColor(255,255,255);
+    doc.setFontSize(18); doc.setFont(undefined,'bold');
+    doc.text('Simulacro Saber TyT — ICFES', 20, 18);
     doc.setFontSize(11); doc.setFont(undefined,'normal');
-    doc.text(`Estudiante: ${u.nombre}`, 20, 38);
-    doc.text(`Fecha: ${new Date().toLocaleDateString('es-CO')}`, 20, 45);
-    doc.text(`Puntaje total: ${r.puntaje_total} / 300`, 20, 52);
-    doc.text(`Preguntas correctas: ${Object.values({LC:r.correctas_LC,RQ:r.correctas_RQ,CE:r.correctas_CE,CC:r.correctas_CC,IN:r.correctas_IN,TE:r.correctas_TE}).reduce((a,b)=>a+b,0)} / ${r.total_preguntas}`, 20, 59);
+    doc.text('Reporte de resultados', 20, 28);
+    doc.setTextColor(0,0,0);
 
-    let y = 72;
+    let y = 58;
+    doc.setFontSize(11);
+    doc.text(`Estudiante : ${u.nombre}`, 20, y); y += 7;
+    doc.text(`Fecha      : ${new Date(r.fecha_completado).toLocaleDateString('es-CO')}`, 20, y); y += 7;
+    doc.text(`Puntaje    : ${r.puntaje_total} / 300`, 20, y); y += 7;
+    const totalCorr = mids.reduce((s,m) => s+(r[`correctas_${m}`]||0), 0);
+    doc.text(`Correctas  : ${totalCorr} / ${r.total_preguntas}`, 20, y); y += 7;
+    const mins = Math.floor(r.tiempo_usado_segundos/60);
+    doc.text(`Duracion   : ${mins} minutos`, 20, y); y += 12;
+
+    // --- Puntaje por modulo ---
     doc.setFont(undefined,'bold'); doc.text('Puntaje por modulo:', 20, y); y += 8;
     doc.setFont(undefined,'normal');
-    const mids = ['LC','RQ','CE','CC','IN','TE'];
     for (const m of mids) {
-      if (r[`puntaje_${m}`] > 0) {
-        doc.text(`  ${NOMBRES_MODULO[m]}: ${r[`puntaje_${m}`]}/300 (${r[`correctas_${m}`]} correctas)`, 20, y);
-        y += 7;
+      if (!r[`puntaje_${m}`]) continue;
+      y = checkY(y);
+      const p = r[`puntaje_${m}`], c = r[`correctas_${m}`]||0;
+      const bar = Math.round(p / 300 * 80);
+      doc.setFillColor(p>=200?22:p>=120?26:220, p>=200?163:p>=120?86:38, p>=200?74:p>=120?219:38);
+      doc.rect(20, y-4, bar, 5, 'F');
+      doc.setTextColor(80,80,80); doc.setFontSize(9);
+      doc.text(`${NOMBRES_MODULO[m]}: ${p}/300 (${c} correctas)`, 105, y); y += 8;
+      doc.setTextColor(0); doc.setFontSize(11);
+    }
+    y += 4;
+
+    // --- Recomendaciones ---
+    y = checkY(y, 30);
+    const promedioMod = {};
+    for (const m of mids) promedioMod[m] = r[`puntaje_${m}`] || 0;
+    // Simple inline recom (no depende de estadisticas.js en este contexto)
+    const recom = [];
+    for (const m of mids) {
+      const v = promedioMod[m];
+      if (v > 0 && v < 120) recom.push(`Refuerza ${NOMBRES_MODULO[m]} (${v}/300 - nivel bajo).`);
+      else if (v >= 120 && v < 180) recom.push(`Continua practicando ${NOMBRES_MODULO[m]} (${v}/300 - nivel medio).`);
+    }
+    if (recom.length) {
+      doc.setFont(undefined,'bold'); doc.text('Recomendaciones:', 20, y); y += 8;
+      doc.setFont(undefined,'normal'); doc.setFontSize(10);
+      for (const rc of recom) {
+        y = checkY(y);
+        const lines = doc.splitTextToSize(`• ${rc}`, 170);
+        doc.text(lines, 22, y); y += lines.length * 5 + 2;
       }
+      doc.setFontSize(11); y += 4;
     }
 
-    y += 5; doc.setFont(undefined,'bold'); doc.text('Preguntas incorrectas:', 20, y); y += 8;
+    // --- Preguntas incorrectas ---
+    y = checkY(y, 20);
+    doc.setFont(undefined,'bold'); doc.text('Preguntas incorrectas:', 20, y); y += 8;
     doc.setFont(undefined,'normal');
     const incorrectas = (r.respuestas_detalle || []).filter(d => !d.correcta);
-    for (const d of incorrectas.slice(0, 30)) {
-      if (y > 270) { doc.addPage(); y = 20; }
-      const lines = doc.splitTextToSize(`• [${d.id}] ${d.pregunta}`, 170);
-      doc.text(lines, 20, y); y += lines.length * 5 + 2;
+    for (const d of incorrectas.slice(0, 40)) {
+      y = checkY(y, 20);
+      const qLines = doc.splitTextToSize(`• [${d.id} | ${['','Bas','Int','Ava'][d.nivel]||''}] ${d.pregunta}`, 170);
+      doc.setFontSize(10); doc.text(qLines, 20, y); y += qLines.length * 5 + 1;
       if (d.explicacion) {
-        const expLines = doc.splitTextToSize(`  Resp.: ${d.explicacion}`, 165);
-        doc.setTextColor(100); doc.text(expLines, 22, y); doc.setTextColor(0);
-        y += expLines.length * 5 + 3;
+        const eLines = doc.splitTextToSize(`  → ${d.explicacion}`, 165);
+        doc.setTextColor(80); doc.text(eLines, 22, y); doc.setTextColor(0);
+        y += eLines.length * 5 + 3;
       }
     }
 
-    doc.save(`Simulacro_SaberTyT_${new Date().toISOString().substring(0,10)}.pdf`);
+    doc.save(`Simulacro_SaberTyT_${r.fecha_completado.substring(0,10)}.pdf`);
   }
 </script>
 </body>

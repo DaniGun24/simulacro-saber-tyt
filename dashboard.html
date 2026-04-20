@@ -6,10 +6,29 @@
   <title>Dashboard — Saber TyT</title>
   <link rel="stylesheet" href="css/main.css">
   <link rel="stylesheet" href="css/dashboard.css">
+  <style>
+    /* Analisis por modulo */
+    .mod-tabs { display:flex; gap:.4rem; flex-wrap:wrap; margin-bottom:1rem; }
+    .mod-tab  { padding:.4rem 1rem; border:1.5px solid var(--border); border-radius:999px; font-size:.85rem; font-weight:600; cursor:pointer; transition:.15s; background:transparent; }
+    .mod-tab.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+    .mod-panel { display:none; } .mod-panel.active { display:block; }
+    .analisis-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem; }
+    .frecuentes-list { list-style:none; display:flex; flex-direction:column; gap:.4rem; }
+    .frecuentes-list li { display:flex; justify-content:space-between; align-items:center; padding:.45rem .75rem; background:var(--bg); border-radius:8px; font-size:.88rem; }
+    .frecuentes-list .badge-count { background:#fee2e2; color:var(--danger); padding:.15rem .55rem; border-radius:999px; font-size:.78rem; font-weight:700; }
+    /* Comparacion */
+    .compare-selects { display:flex; gap:1rem; align-items:flex-end; flex-wrap:wrap; margin-bottom:1rem; }
+    .compare-selects select { flex:1; min-width:200px; padding:.55rem .8rem; border:1.5px solid var(--border); border-radius:var(--radius); font-size:.9rem; }
+    .diff-table { width:100%; border-collapse:collapse; font-size:.88rem; }
+    .diff-table th { background:var(--bg); padding:.5rem .75rem; text-align:left; font-size:.8rem; font-weight:700; text-transform:uppercase; color:var(--text-2); border-bottom:2px solid var(--border); }
+    .diff-table td { padding:.55rem .75rem; border-bottom:1px solid var(--border); }
+    .diff-pos { color:var(--success); font-weight:700; }
+    .diff-neg { color:var(--danger);  font-weight:700; }
+    .diff-neu { color:var(--text-2); }
+  </style>
 </head>
 <body>
 
-<!-- Header -->
 <header class="app-header">
   <span class="app-logo">📋 Saber TyT</span>
   <div class="app-header-spacer"></div>
@@ -17,16 +36,13 @@
   <button class="btn btn-outline btn-sm" onclick="cerrarSesion()">Cerrar sesion</button>
 </header>
 
-<!-- Main -->
 <main class="dashboard-layout">
 
-  <!-- Cargando -->
   <div id="loading-state" class="flex flex-col items-center gap-2 mt-3" style="padding:3rem 0">
     <div class="spinner"></div>
     <p style="color:var(--text-2)">Cargando tu informacion…</p>
   </div>
 
-  <!-- Contenido -->
   <div id="dashboard-content" class="hidden">
 
     <!-- Encabezado -->
@@ -42,7 +58,7 @@
     </div>
 
     <!-- Stats cards -->
-    <div class="stats-grid" id="stats-grid">
+    <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-value" id="stat-total">0</div>
         <div class="stat-label">Simulacros realizados</div>
@@ -57,7 +73,11 @@
       </div>
       <div class="stat-card">
         <div class="stat-value" id="stat-tiempo">—</div>
-        <div class="stat-label">Seg/pregunta promedio</div>
+        <div class="stat-label">Seg / pregunta</div>
+      </div>
+      <div class="stat-card" id="stat-n3-card" style="display:none">
+        <div class="stat-value" id="stat-n3">—</div>
+        <div class="stat-label">% Acierto nivel avanzado</div>
       </div>
     </div>
 
@@ -69,7 +89,7 @@
       <a href="configurar.html" class="btn btn-primary">Comenzar ahora</a>
     </div>
 
-    <!-- Graficas -->
+    <!-- Graficas globales -->
     <div id="charts-section" class="charts-row hidden">
       <div class="chart-card">
         <h3>Evolucion del puntaje</h3>
@@ -81,8 +101,8 @@
       </div>
     </div>
 
-    <!-- Fortalezas / debilidades -->
-    <div id="insights-section" class="hidden" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem">
+    <!-- Fortaleza / debilidad -->
+    <div id="insights-section" class="hidden" style="display:none;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem">
       <div class="card">
         <div class="card-title" style="color:var(--success)">✅ Fortaleza</div>
         <p id="insight-mejor" style="font-size:.95rem"></p>
@@ -93,13 +113,47 @@
       </div>
     </div>
 
-    <!-- Recomendaciones -->
+    <!-- Recomendaciones globales -->
     <div id="recom-section" class="card hidden" style="margin-bottom:1.5rem">
       <div class="card-title">💡 Recomendaciones de estudio</div>
       <ul class="recommendation-list" id="recom-list"></ul>
     </div>
 
-    <!-- Historial -->
+    <!-- ===== ANALISIS POR MODULO ===== -->
+    <div id="analisis-section" class="hidden" style="margin-bottom:2rem">
+      <div class="section-header mb-1">
+        <h2>Analisis por modulo</h2>
+      </div>
+      <div class="mod-tabs" id="mod-tabs"></div>
+      <div id="mod-panels"></div>
+    </div>
+
+    <!-- ===== COMPARAR SIMULACROS ===== -->
+    <div id="compare-section" class="card hidden" style="margin-bottom:2rem">
+      <div class="card-title">🔀 Comparar dos simulacros</div>
+      <div class="compare-selects">
+        <div class="form-group" style="flex:1">
+          <label class="form-label">Simulacro A</label>
+          <select id="compare-a"></select>
+        </div>
+        <div class="form-group" style="flex:1">
+          <label class="form-label">Simulacro B</label>
+          <select id="compare-b"></select>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="ejecutarComparacion()">Comparar</button>
+      </div>
+      <div id="compare-result" class="hidden">
+        <canvas id="chart-comparacion" height="160" style="margin-bottom:1rem"></canvas>
+        <div style="overflow-x:auto">
+          <table class="diff-table">
+            <thead><tr><th>Modulo</th><th>Simulacro A</th><th>Simulacro B</th><th>Diferencia</th></tr></thead>
+            <tbody id="compare-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== HISTORIAL ===== -->
     <div id="history-section" class="hidden">
       <div class="section-header">
         <h2>Historial de simulacros</h2>
@@ -112,9 +166,9 @@
                 <th>Fecha</th>
                 <th>Modulos</th>
                 <th>Preguntas</th>
-                <th>Puntaje total</th>
+                <th>Puntaje</th>
                 <th>Duracion</th>
-                <th>Accion</th>
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody id="history-body"></tbody>
@@ -128,7 +182,7 @@
 
 <div class="toast-container" id="toast-container"></div>
 
-<!-- Modal confirmar continuar sesion -->
+<!-- Modal sesion activa -->
 <div class="modal-overlay hidden" id="modal-sesion">
   <div class="modal">
     <div class="modal-title">Simulacro en progreso</div>
@@ -141,13 +195,14 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="js/config.js"></script>
 <script src="js/sheets.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/estadisticas.js"></script>
 <script>
   let sesionGuardada = null;
-  const MODULO_NOMBRES = { LC:'Lectura Critica', RQ:'Razonamiento Cuant.', CE:'Com. Escrita', CC:'Comp. Ciudadanas', IN:'Ingles', TE:'Telecom.' };
+  let _resultados    = [];
 
   let gapiReady = false, gisReady = false;
   function gapiLoaded() { gapiReady = true; tryInit(); }
@@ -161,8 +216,8 @@
   window.addEventListener('DOMContentLoaded', () => {
     if (!verificarSesion()) return;
     const u = obtenerUsuarioActual();
-    document.getElementById('header-user').textContent = u.nombre;
-    document.getElementById('welcome-msg').textContent = `Hola, ${u.nombre.split(' ')[0]} 👋`;
+    document.getElementById('header-user').textContent  = u.nombre;
+    document.getElementById('welcome-msg').textContent  = `Hola, ${u.nombre.split(' ')[0]} 👋`;
   });
 
   async function cargarDashboard() {
@@ -170,73 +225,206 @@
     try {
       await Sheets.autenticar();
 
-      // Verificar sesion activa
       sesionGuardada = await Sheets.obtenerSesionActiva(u.usuario_id);
-      if (sesionGuardada) {
-        document.getElementById('modal-sesion').classList.remove('hidden');
-      }
+      if (sesionGuardada) document.getElementById('modal-sesion').classList.remove('hidden');
 
-      const resultados = await Sheets.obtenerResultadosUsuario(u.usuario_id);
+      _resultados = await Sheets.obtenerResultadosUsuario(u.usuario_id);
       document.getElementById('loading-state').classList.add('hidden');
       document.getElementById('dashboard-content').classList.remove('hidden');
 
-      if (!resultados.length) {
+      if (!_resultados.length) {
         document.getElementById('no-history').classList.remove('hidden');
         return;
       }
 
-      const resumen = Estadisticas.calcularResumen(resultados);
+      const resumen = Estadisticas.calcularResumen(_resultados);
 
       // Stats
-      document.getElementById('stat-total').textContent   = resumen.total;
-      document.getElementById('stat-avg').textContent     = resumen.promedioGral + '/300';
-      document.getElementById('stat-streak').textContent  = resumen.streak;
-      document.getElementById('stat-tiempo').textContent  = resumen.tiempoPromedio + 's';
+      document.getElementById('stat-total').textContent  = resumen.total;
+      document.getElementById('stat-avg').textContent    = resumen.promedioGral + '/300';
+      document.getElementById('stat-streak').textContent = resumen.streak;
+      document.getElementById('stat-tiempo').textContent = resumen.tiempoPromedio + 's';
+      if (resumen.pctNivel3 !== null) {
+        document.getElementById('stat-n3').textContent    = resumen.pctNivel3 + '%';
+        document.getElementById('stat-n3-card').style.display = '';
+      }
 
       // Graficas
       document.getElementById('charts-section').classList.remove('hidden');
-      Estadisticas.renderGraficaEvolucion('chart-evolucion', resultados);
+      Estadisticas.renderGraficaEvolucion('chart-evolucion', _resultados);
       Estadisticas.renderGraficaModulos('chart-modulos', resumen.promedioModulo);
 
       // Insights
-      document.getElementById('insights-section').style.display = 'grid';
-      document.getElementById('insights-section').classList.remove('hidden');
-      document.getElementById('insight-mejor').textContent = MODULO_NOMBRES[resumen.mejor] + ` (${Math.round(resumen.promedioModulo[resumen.mejor])}/300)`;
-      document.getElementById('insight-peor').textContent  = MODULO_NOMBRES[resumen.peor]  + ` (${Math.round(resumen.promedioModulo[resumen.peor])}/300)`;
+      const ins = document.getElementById('insights-section');
+      ins.style.display = 'grid'; ins.classList.remove('hidden');
+      document.getElementById('insight-mejor').textContent = `${Estadisticas.MOD_NOMBRE[resumen.mejor]} (${Math.round(resumen.promedioModulo[resumen.mejor])}/300)`;
+      document.getElementById('insight-peor').textContent  = `${Estadisticas.MOD_NOMBRE[resumen.peor]}  (${Math.round(resumen.promedioModulo[resumen.peor])}/300)`;
 
       // Recomendaciones
-      const recom = Estadisticas.recomendaciones(resumen.promedioModulo);
       document.getElementById('recom-section').classList.remove('hidden');
-      document.getElementById('recom-list').innerHTML = recom.map(r => `<li>${r}</li>`).join('');
+      document.getElementById('recom-list').innerHTML = Estadisticas.recomendaciones(resumen.promedioModulo).map(r => `<li>${r}</li>`).join('');
+
+      // Analisis por modulo
+      renderAnalisisModulos(resumen);
+
+      // Comparar
+      renderComparacion();
 
       // Historial
       document.getElementById('history-section').classList.remove('hidden');
-      renderHistorial(resultados);
+      renderHistorial(_resultados);
 
     } catch (err) {
       document.getElementById('loading-state').innerHTML = `<div class="alert alert-error">Error al cargar datos: ${err.message}</div>`;
     }
   }
 
-  function renderHistorial(resultados) {
-    const tbody = document.getElementById('history-body');
-    const ordenados = [...resultados].sort((a, b) => b.fecha_completado.localeCompare(a.fecha_completado));
-    tbody.innerHTML = ordenados.map(r => {
-      const fecha = r.fecha_completado.substring(0, 10);
-      const mins  = Math.floor(r.tiempo_usado_segundos / 60);
-      const nivel = r.puntaje_total >= 200 ? 'success' : r.puntaje_total >= 120 ? 'primary' : 'danger';
-      return `
-        <tr>
-          <td>${fecha}</td>
-          <td>${r.total_preguntas} pregs.</td>
-          <td>${r.total_preguntas}</td>
-          <td><span class="badge badge-${nivel}">${r.puntaje_total}/300</span></td>
-          <td>${mins} min</td>
-          <td><a href="resultados.html?id=${r.id_resultado}" class="btn btn-ghost btn-sm">Ver detalle</a></td>
-        </tr>`;
-    }).join('');
+  // ---------- Analisis por modulo ----------
+  function renderAnalisisModulos(resumen) {
+    const modulosActivos = Estadisticas.MOD_IDS.filter(m => resumen.promedioModulo[m] > 0);
+    if (!modulosActivos.length) return;
+    document.getElementById('analisis-section').classList.remove('hidden');
+
+    const tabsEl   = document.getElementById('mod-tabs');
+    const panelsEl = document.getElementById('mod-panels');
+    tabsEl.innerHTML   = '';
+    panelsEl.innerHTML = '';
+
+    modulosActivos.forEach((m, idx) => {
+      // Tab
+      const btn = document.createElement('button');
+      btn.className = 'mod-tab' + (idx === 0 ? ' active' : '');
+      btn.textContent = Estadisticas.MOD_NOMBRE[m].split(' ')[0];
+      btn.onclick = () => {
+        document.querySelectorAll('.mod-tab').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.mod-panel').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(`panel-${m}`).classList.add('active');
+      };
+      tabsEl.appendChild(btn);
+
+      // Panel
+      const analisis = Estadisticas.calcularAnalisisModulo(_resultados, m);
+      const recom    = Estadisticas.recomendacionModulo(analisis, m);
+
+      const panel = document.createElement('div');
+      panel.id = `panel-${m}`;
+      panel.className = 'mod-panel' + (idx === 0 ? ' active' : '');
+      panel.innerHTML = `
+        <div class="analisis-grid">
+          <div class="chart-card">
+            <h3 style="font-size:.9rem">Evolucion de puntaje</h3>
+            ${analisis.evolucion.length >= 2
+              ? `<canvas id="chart-mod-${m}" height="160"></canvas>`
+              : `<p style="color:var(--text-2);font-size:.88rem;padding:.5rem">Necesitas al menos 2 simulacros con este modulo.</p>`}
+          </div>
+          <div class="chart-card">
+            <h3 style="font-size:.9rem">Acierto por nivel de dificultad</h3>
+            ${Object.values(analisis.dist).some(d => d.total > 0)
+              ? `<canvas id="chart-niv-${m}" height="160"></canvas>`
+              : `<p style="color:var(--text-2);font-size:.88rem;padding:.5rem">Sin datos suficientes.</p>`}
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+          <div class="card">
+            <div class="card-title" style="font-size:.88rem">⚠️ Preguntas mas falladas</div>
+            ${analisis.frecuentes.length
+              ? `<ul class="frecuentes-list">${analisis.frecuentes.map(f => `<li><span>${f.id}</span><span class="badge-count">${f.veces}x</span></li>`).join('')}</ul>`
+              : `<p style="color:var(--text-2);font-size:.85rem">Sin errores repetidos. ¡Bien!</p>`}
+          </div>
+          <div class="card">
+            <div class="card-title" style="font-size:.88rem">💡 Recomendaciones</div>
+            <ul style="list-style:none;display:flex;flex-direction:column;gap:.4rem">
+              ${recom.map(r => `<li style="font-size:.88rem;padding:.4rem .6rem;background:#eff6ff;border-left:3px solid var(--primary);border-radius:0 6px 6px 0">${r}</li>`).join('')}
+            </ul>
+          </div>
+        </div>`;
+      panelsEl.appendChild(panel);
+    });
+
+    // Renderizar graficas despues de insertar al DOM
+    requestAnimationFrame(() => {
+      modulosActivos.forEach(m => {
+        const a = Estadisticas.calcularAnalisisModulo(_resultados, m);
+        if (a.evolucion.length >= 2) Estadisticas.renderGraficaEvolucionModulo(`chart-mod-${m}`, a.evolucion, m);
+        if (Object.values(a.dist).some(d => d.total > 0)) Estadisticas.renderGraficaNiveles(`chart-niv-${m}`, a.dist);
+      });
+    });
   }
 
+  // ---------- Comparacion ----------
+  function renderComparacion() {
+    if (_resultados.length < 2) return;
+    document.getElementById('compare-section').classList.remove('hidden');
+    const opts = [..._resultados]
+      .sort((a, b) => b.fecha_completado.localeCompare(a.fecha_completado))
+      .map((r, i) => `<option value="${i}">${r.fecha_completado.substring(0,10)} — ${r.puntaje_total}/300</option>`)
+      .join('');
+    document.getElementById('compare-a').innerHTML = opts;
+    document.getElementById('compare-b').innerHTML = opts;
+    document.getElementById('compare-b').selectedIndex = 1;
+  }
+
+  function ejecutarComparacion() {
+    const ordenados = [..._resultados].sort((a, b) => b.fecha_completado.localeCompare(a.fecha_completado));
+    const idxA = parseInt(document.getElementById('compare-a').value);
+    const idxB = parseInt(document.getElementById('compare-b').value);
+    if (idxA === idxB) { toast('Selecciona dos simulacros diferentes.', 'error'); return; }
+
+    const r1   = ordenados[idxA];
+    const r2   = ordenados[idxB];
+    const comp = Estadisticas.compararSimulacros(r1, r2);
+    const lA   = r1.fecha_completado.substring(0,10);
+    const lB   = r2.fecha_completado.substring(0,10);
+
+    document.getElementById('compare-result').classList.remove('hidden');
+    Estadisticas.renderGraficaComparacion('chart-comparacion', comp, lA, lB);
+
+    document.getElementById('compare-tbody').innerHTML = comp
+      .filter(c => c.p1 > 0 || c.p2 > 0)
+      .map(c => {
+        const cls = c.diff > 0 ? 'diff-pos' : c.diff < 0 ? 'diff-neg' : 'diff-neu';
+        const sig = c.diff > 0 ? '+' : '';
+        return `<tr><td>${c.modulo}</td><td>${c.p1||'—'}</td><td>${c.p2||'—'}</td><td class="${cls}">${c.p1&&c.p2 ? sig+c.diff : '—'}</td></tr>`;
+      }).join('');
+  }
+
+  // ---------- Historial ----------
+  function renderHistorial(resultados) {
+    const MOD_SHORT = { LC:'LC', RQ:'RQ', CE:'CE', CC:'CC', IN:'EN', TE:'TE' };
+    const tbody = document.getElementById('history-body');
+    const ordenados = [...resultados].sort((a, b) => b.fecha_completado.localeCompare(a.fecha_completado));
+    tbody.innerHTML = ordenados.map((r, i) => {
+      const fecha  = r.fecha_completado.substring(0, 10);
+      const mins   = Math.floor(r.tiempo_usado_segundos / 60);
+      const secs   = r.tiempo_usado_segundos % 60;
+      const nivel  = r.puntaje_total >= 200 ? 'success' : r.puntaje_total >= 120 ? 'primary' : 'danger';
+      const modulos = Estadisticas.MOD_IDS.filter(m => r[`puntaje_${m}`] > 0)
+        .map(m => `<span class="badge badge-primary" style="font-size:.72rem">${MOD_SHORT[m]}</span>`).join(' ');
+      return `<tr>
+        <td>${fecha}</td>
+        <td>${modulos || '—'}</td>
+        <td>${r.total_preguntas}</td>
+        <td><span class="badge badge-${nivel}">${r.puntaje_total}/300</span></td>
+        <td>${mins}m ${secs}s</td>
+        <td style="display:flex;gap:.4rem">
+          <a href="resultados.html?idx=${i}" class="btn btn-ghost btn-sm" onclick="localStorage.setItem('ultimo_resultado', JSON.stringify(${JSON.stringify(JSON.stringify(r))}))">Ver</a>
+          <button class="btn btn-ghost btn-sm" onclick="descargarPDFHistorial(${i})">PDF</button>
+        </td>
+      </tr>`;
+    }).join('');
+    window._resultadosOrdenados = ordenados;
+  }
+
+  function descargarPDFHistorial(idx) {
+    const r = window._resultadosOrdenados[idx];
+    if (!r) return;
+    localStorage.setItem('ultimo_resultado', JSON.stringify(r));
+    // Reusar la funcion de resultados.html via navegacion temporal
+    window.open('resultados.html?pdf=1', '_blank');
+  }
+
+  // ---------- Sesion activa ----------
   function continuarSesion() {
     document.getElementById('modal-sesion').classList.add('hidden');
     if (sesionGuardada) {
@@ -255,10 +443,8 @@
   function toast(msg, tipo = '') {
     const c = document.getElementById('toast-container');
     const t = document.createElement('div');
-    t.className = `toast ${tipo}`;
-    t.textContent = msg;
-    c.appendChild(t);
-    setTimeout(() => t.remove(), 3500);
+    t.className = `toast ${tipo}`; t.textContent = msg;
+    c.appendChild(t); setTimeout(() => t.remove(), 3500);
   }
 </script>
 <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
