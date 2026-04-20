@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — Saber TyT</title>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+</head>
+<body>
+
+<!-- Header -->
+<header class="app-header">
+  <span class="app-logo">📋 Saber TyT</span>
+  <div class="app-header-spacer"></div>
+  <span id="header-user" style="font-size:.9rem;color:var(--text-2)"></span>
+  <button class="btn btn-outline btn-sm" onclick="cerrarSesion()">Cerrar sesion</button>
+</header>
+
+<!-- Main -->
+<main class="dashboard-layout">
+
+  <!-- Cargando -->
+  <div id="loading-state" class="flex flex-col items-center gap-2 mt-3" style="padding:3rem 0">
+    <div class="spinner"></div>
+    <p style="color:var(--text-2)">Cargando tu informacion…</p>
+  </div>
+
+  <!-- Contenido -->
+  <div id="dashboard-content" class="hidden">
+
+    <!-- Encabezado -->
+    <div class="flex items-center justify-between mb-2" style="flex-wrap:wrap;gap:1rem">
+      <div>
+        <h1 style="font-size:1.5rem;font-weight:800" id="welcome-msg">Bienvenido</h1>
+        <p style="color:var(--text-2);font-size:.9rem">Aqui puedes ver tu progreso y comenzar un nuevo simulacro.</p>
+      </div>
+      <div class="flex gap-1" style="flex-wrap:wrap">
+        <a href="configurar.html" class="btn btn-primary">▶ Nuevo simulacro</a>
+        <a href="configurar.html?modo=practica" class="btn btn-outline">✏️ Modo practica</a>
+      </div>
+    </div>
+
+    <!-- Stats cards -->
+    <div class="stats-grid" id="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value" id="stat-total">0</div>
+        <div class="stat-label">Simulacros realizados</div>
+      </div>
+      <div class="stat-card success">
+        <div class="stat-value" id="stat-avg">—</div>
+        <div class="stat-label">Puntaje promedio</div>
+      </div>
+      <div class="stat-card warning">
+        <div class="stat-value" id="stat-streak">0</div>
+        <div class="stat-label">Dias en racha 🔥</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-tiempo">—</div>
+        <div class="stat-label">Seg/pregunta promedio</div>
+      </div>
+    </div>
+
+    <!-- Sin historial -->
+    <div id="no-history" class="card text-center hidden" style="padding:3rem">
+      <div style="font-size:3rem;margin-bottom:1rem">📝</div>
+      <h3 style="font-size:1.1rem;font-weight:700;margin-bottom:.5rem">Aun no has hecho ningun simulacro</h3>
+      <p style="color:var(--text-2);margin-bottom:1.5rem">Comienza tu primer simulacro para ver tu progreso aqui.</p>
+      <a href="configurar.html" class="btn btn-primary">Comenzar ahora</a>
+    </div>
+
+    <!-- Graficas -->
+    <div id="charts-section" class="charts-row hidden">
+      <div class="chart-card">
+        <h3>Evolucion del puntaje</h3>
+        <canvas id="chart-evolucion" height="180"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Puntaje promedio por modulo</h3>
+        <canvas id="chart-modulos" height="180"></canvas>
+      </div>
+    </div>
+
+    <!-- Fortalezas / debilidades -->
+    <div id="insights-section" class="hidden" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem">
+      <div class="card">
+        <div class="card-title" style="color:var(--success)">✅ Fortaleza</div>
+        <p id="insight-mejor" style="font-size:.95rem"></p>
+      </div>
+      <div class="card">
+        <div class="card-title" style="color:var(--danger)">⚠️ Area de mejora</div>
+        <p id="insight-peor" style="font-size:.95rem"></p>
+      </div>
+    </div>
+
+    <!-- Recomendaciones -->
+    <div id="recom-section" class="card hidden" style="margin-bottom:1.5rem">
+      <div class="card-title">💡 Recomendaciones de estudio</div>
+      <ul class="recommendation-list" id="recom-list"></ul>
+    </div>
+
+    <!-- Historial -->
+    <div id="history-section" class="hidden">
+      <div class="section-header">
+        <h2>Historial de simulacros</h2>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <div style="overflow-x:auto">
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Modulos</th>
+                <th>Preguntas</th>
+                <th>Puntaje total</th>
+                <th>Duracion</th>
+                <th>Accion</th>
+              </tr>
+            </thead>
+            <tbody id="history-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<div class="toast-container" id="toast-container"></div>
+
+<!-- Modal confirmar continuar sesion -->
+<div class="modal-overlay hidden" id="modal-sesion">
+  <div class="modal">
+    <div class="modal-title">Simulacro en progreso</div>
+    <p style="font-size:.95rem;color:var(--text-2)">Tienes un simulacro guardado. ¿Deseas continuar donde lo dejaste o iniciar uno nuevo?</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="descartarSesion()">Iniciar nuevo</button>
+      <button class="btn btn-primary" onclick="continuarSesion()">Continuar</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="js/config.js"></script>
+<script src="js/sheets.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/estadisticas.js"></script>
+<script>
+  let sesionGuardada = null;
+  const MODULO_NOMBRES = { LC:'Lectura Critica', RQ:'Razonamiento Cuant.', CE:'Com. Escrita', CC:'Comp. Ciudadanas', IN:'Ingles', TE:'Telecom.' };
+
+  let gapiReady = false, gisReady = false;
+  function gapiLoaded() { gapiReady = true; tryInit(); }
+  function gisLoaded()  { gisReady  = true; tryInit(); }
+  async function tryInit() {
+    if (!gapiReady || !gisReady) return;
+    await Sheets.inicializar();
+    cargarDashboard();
+  }
+
+  window.addEventListener('DOMContentLoaded', () => {
+    if (!verificarSesion()) return;
+    const u = obtenerUsuarioActual();
+    document.getElementById('header-user').textContent = u.nombre;
+    document.getElementById('welcome-msg').textContent = `Hola, ${u.nombre.split(' ')[0]} 👋`;
+  });
+
+  async function cargarDashboard() {
+    const u = obtenerUsuarioActual();
+    try {
+      await Sheets.autenticar();
+
+      // Verificar sesion activa
+      sesionGuardada = await Sheets.obtenerSesionActiva(u.usuario_id);
+      if (sesionGuardada) {
+        document.getElementById('modal-sesion').classList.remove('hidden');
+      }
+
+      const resultados = await Sheets.obtenerResultadosUsuario(u.usuario_id);
+      document.getElementById('loading-state').classList.add('hidden');
+      document.getElementById('dashboard-content').classList.remove('hidden');
+
+      if (!resultados.length) {
+        document.getElementById('no-history').classList.remove('hidden');
+        return;
+      }
+
+      const resumen = Estadisticas.calcularResumen(resultados);
+
+      // Stats
+      document.getElementById('stat-total').textContent   = resumen.total;
+      document.getElementById('stat-avg').textContent     = resumen.promedioGral + '/300';
+      document.getElementById('stat-streak').textContent  = resumen.streak;
+      document.getElementById('stat-tiempo').textContent  = resumen.tiempoPromedio + 's';
+
+      // Graficas
+      document.getElementById('charts-section').classList.remove('hidden');
+      Estadisticas.renderGraficaEvolucion('chart-evolucion', resultados);
+      Estadisticas.renderGraficaModulos('chart-modulos', resumen.promedioModulo);
+
+      // Insights
+      document.getElementById('insights-section').style.display = 'grid';
+      document.getElementById('insights-section').classList.remove('hidden');
+      document.getElementById('insight-mejor').textContent = MODULO_NOMBRES[resumen.mejor] + ` (${Math.round(resumen.promedioModulo[resumen.mejor])}/300)`;
+      document.getElementById('insight-peor').textContent  = MODULO_NOMBRES[resumen.peor]  + ` (${Math.round(resumen.promedioModulo[resumen.peor])}/300)`;
+
+      // Recomendaciones
+      const recom = Estadisticas.recomendaciones(resumen.promedioModulo);
+      document.getElementById('recom-section').classList.remove('hidden');
+      document.getElementById('recom-list').innerHTML = recom.map(r => `<li>${r}</li>`).join('');
+
+      // Historial
+      document.getElementById('history-section').classList.remove('hidden');
+      renderHistorial(resultados);
+
+    } catch (err) {
+      document.getElementById('loading-state').innerHTML = `<div class="alert alert-error">Error al cargar datos: ${err.message}</div>`;
+    }
+  }
+
+  function renderHistorial(resultados) {
+    const tbody = document.getElementById('history-body');
+    const ordenados = [...resultados].sort((a, b) => b.fecha_completado.localeCompare(a.fecha_completado));
+    tbody.innerHTML = ordenados.map(r => {
+      const fecha = r.fecha_completado.substring(0, 10);
+      const mins  = Math.floor(r.tiempo_usado_segundos / 60);
+      const nivel = r.puntaje_total >= 200 ? 'success' : r.puntaje_total >= 120 ? 'primary' : 'danger';
+      return `
+        <tr>
+          <td>${fecha}</td>
+          <td>${r.total_preguntas} pregs.</td>
+          <td>${r.total_preguntas}</td>
+          <td><span class="badge badge-${nivel}">${r.puntaje_total}/300</span></td>
+          <td>${mins} min</td>
+          <td><a href="resultados.html?id=${r.id_resultado}" class="btn btn-ghost btn-sm">Ver detalle</a></td>
+        </tr>`;
+    }).join('');
+  }
+
+  function continuarSesion() {
+    document.getElementById('modal-sesion').classList.add('hidden');
+    if (sesionGuardada) {
+      localStorage.setItem('sesion_continuar', sesionGuardada.id_sesion);
+      window.location.href = 'simulacro.html';
+    }
+  }
+
+  async function descartarSesion() {
+    document.getElementById('modal-sesion').classList.add('hidden');
+    const u = obtenerUsuarioActual();
+    await Sheets.abandonarSesionesActivas(u.usuario_id);
+    sesionGuardada = null;
+  }
+
+  function toast(msg, tipo = '') {
+    const c = document.getElementById('toast-container');
+    const t = document.createElement('div');
+    t.className = `toast ${tipo}`;
+    t.textContent = msg;
+    c.appendChild(t);
+    setTimeout(() => t.remove(), 3500);
+  }
+</script>
+<script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+<script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
+</body>
+</html>

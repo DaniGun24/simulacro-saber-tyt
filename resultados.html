@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Resultados — Saber TyT</title>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+  <style>
+    .results-layout { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+    .score-hero {
+      text-align: center; background: linear-gradient(135deg, #1a56db 0%, #1447c0 100%);
+      color: #fff; border-radius: var(--radius); padding: 2.5rem 2rem; margin-bottom: 2rem;
+    }
+    .score-hero .score-big { font-size: 5rem; font-weight: 900; line-height: 1; }
+    .score-hero .score-label { font-size: 1rem; opacity: .8; margin-top: .5rem; }
+    .score-hero .score-sub { font-size: 1.1rem; margin-top: 1rem; opacity: .9; }
+
+    .modulo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .modulo-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.2rem; }
+    .modulo-card h4 { font-size: .88rem; font-weight: 700; margin-bottom: .5rem; color: var(--text-2); }
+    .modulo-card .mod-score { font-size: 1.5rem; font-weight: 800; }
+    .modulo-card .mod-score.high  { color: var(--success); }
+    .modulo-card .mod-score.mid   { color: var(--primary); }
+    .modulo-card .mod-score.low   { color: var(--danger); }
+    .modulo-card .mod-bar { margin-top: .6rem; }
+
+    .review-filters { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .filter-btn { padding: .35rem .85rem; border: 1.5px solid var(--border); border-radius: 999px; background: transparent; font-size: .85rem; cursor: pointer; transition: .15s; }
+    .filter-btn.active { border-color: var(--primary); background: var(--primary); color: #fff; }
+
+    .review-item {
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 1.2rem 1.4rem; margin-bottom: .75rem;
+    }
+    .review-item.correct  { border-left: 4px solid var(--success); }
+    .review-item.incorrect{ border-left: 4px solid var(--danger);  }
+    .review-meta { display: flex; gap: .6rem; align-items: center; margin-bottom: .6rem; flex-wrap: wrap; }
+    .review-pregunta { font-size: .97rem; line-height: 1.55; margin-bottom: .75rem; }
+    .review-opciones { display: grid; grid-template-columns: 1fr 1fr; gap: .35rem; }
+    .review-opcion { padding: .4rem .7rem; border-radius: 6px; font-size: .85rem; display: flex; gap: .5rem; }
+    .review-opcion.usuario  { background: #fee2e2; color: var(--danger); }
+    .review-opcion.correcta { background: #dcfce7; color: var(--success); }
+    .review-opcion.correcta-usuario { background: #dcfce7; color: var(--success); }
+    .review-explicacion { margin-top: .75rem; padding: .65rem .9rem; background: #f0fdf4; border-radius: 6px; font-size: .88rem; color: var(--text-2); }
+  </style>
+</head>
+<body>
+
+<header class="app-header">
+  <a href="dashboard.html" class="btn btn-ghost btn-sm">← Dashboard</a>
+  <span class="app-logo">📋 Saber TyT</span>
+  <div class="app-header-spacer"></div>
+  <button class="btn btn-outline btn-sm" onclick="descargarPDF()">📄 Descargar PDF</button>
+</header>
+
+<main class="results-layout" id="results-layout">
+
+  <div id="loading-results" class="flex flex-col items-center" style="padding:4rem 0;gap:1rem">
+    <div class="spinner"></div>
+    <p style="color:var(--text-2)">Cargando resultados…</p>
+  </div>
+
+  <div id="results-content" class="hidden">
+
+    <!-- Score hero -->
+    <div class="score-hero" id="score-hero">
+      <div style="font-size:.9rem;opacity:.7;margin-bottom:.5rem">PUNTAJE TOTAL SIMULADO</div>
+      <div class="score-big" id="score-total">0</div>
+      <div class="score-label">/ 300 escala ICFES</div>
+      <div class="score-sub" id="score-sub"></div>
+    </div>
+
+    <!-- Por modulo -->
+    <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:1rem">Resultados por modulo</h2>
+    <div class="modulo-grid" id="modulo-grid"></div>
+
+    <!-- Tiempo -->
+    <div class="card mb-2" style="display:flex;gap:2rem;flex-wrap:wrap">
+      <div><div style="font-size:1.4rem;font-weight:800;color:var(--primary)" id="tiempo-usado">—</div><div style="font-size:.85rem;color:var(--text-2)">Tiempo total usado</div></div>
+      <div><div style="font-size:1.4rem;font-weight:800;color:var(--primary)" id="seg-por-preg">—</div><div style="font-size:.85rem;color:var(--text-2)">Segundos por pregunta</div></div>
+      <div><div style="font-size:1.4rem;font-weight:800;color:var(--success)" id="total-correctas">—</div><div style="font-size:.85rem;color:var(--text-2)">Correctas / Total</div></div>
+    </div>
+
+    <!-- Revision de respuestas -->
+    <div id="revision-section">
+      <div class="section-header mt-2 mb-1">
+        <h2>Revision de respuestas</h2>
+      </div>
+      <div class="review-filters">
+        <button class="filter-btn active" onclick="filtrar('todas',this)">Todas</button>
+        <button class="filter-btn" onclick="filtrar('correctas',this)">Correctas ✅</button>
+        <button class="filter-btn" onclick="filtrar('incorrectas',this)">Incorrectas ❌</button>
+        <button class="filter-btn" onclick="filtrar('marcadas',this)">Marcadas 🚩</button>
+      </div>
+      <div id="review-list"></div>
+    </div>
+
+    <div style="margin-top:2rem;display:flex;gap:1rem;flex-wrap:wrap">
+      <a href="configurar.html" class="btn btn-primary">▶ Nuevo simulacro</a>
+      <a href="dashboard.html" class="btn btn-outline">← Dashboard</a>
+      <button class="btn btn-ghost" onclick="descargarPDF()">📄 PDF</button>
+    </div>
+  </div>
+</main>
+
+<div class="toast-container" id="toast-container"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/sheets.js"></script>
+<script src="js/auth.js"></script>
+<script>
+  let resultadoActual = null;
+  const LETRAS = ['A','B','C','D'];
+  const NOMBRES_MODULO = {
+    LC:'Lectura Critica', RQ:'Razonamiento Cuantitativo', CE:'Comunicacion Escrita',
+    CC:'Competencias Ciudadanas', IN:'Ingles', TE:'Telecomunicaciones Especifico',
+  };
+
+  window.addEventListener('DOMContentLoaded', () => {
+    if (!verificarSesion()) return;
+    const raw = localStorage.getItem('ultimo_resultado');
+    if (raw) {
+      resultadoActual = JSON.parse(raw);
+      mostrarResultados(resultadoActual);
+    } else {
+      document.getElementById('loading-results').innerHTML = '<div class="alert alert-error">No se encontraron resultados. <a href="dashboard.html">Ir al dashboard</a></div>';
+    }
+  });
+
+  function mostrarResultados(r) {
+    document.getElementById('loading-results').classList.add('hidden');
+    document.getElementById('results-content').classList.remove('hidden');
+
+    document.getElementById('score-total').textContent = r.puntaje_total;
+
+    const pct = Math.round(r.puntaje_total / 300 * 100);
+    let desc = pct >= 70 ? '🎉 Excelente desempeno' : pct >= 50 ? '👍 Buen resultado' : '📚 Sigue practicando';
+    document.getElementById('score-sub').textContent = `${desc} · ${r.total_preguntas} preguntas`;
+
+    // Modulos
+    const mids = ['LC','RQ','CE','CC','IN','TE'];
+    document.getElementById('modulo-grid').innerHTML = mids
+      .filter(m => r[`puntaje_${m}`] !== undefined && r.total_preguntas > 0)
+      .map(m => {
+        const p = r[`puntaje_${m}`] || 0;
+        const c = r[`correctas_${m}`] || 0;
+        const lvlCls = p >= 200 ? 'high' : p >= 120 ? 'mid' : 'low';
+        const pct = Math.round(p / 300 * 100);
+        return `<div class="modulo-card">
+          <h4>${NOMBRES_MODULO[m]}</h4>
+          <div class="mod-score ${lvlCls}">${p}<span style="font-size:.9rem;font-weight:400;color:var(--text-2)">/300</span></div>
+          <div class="mod-bar">
+            <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${p>=200?'var(--success)':p>=120?'var(--primary)':'var(--danger)'}"></div></div>
+          </div>
+          <div style="font-size:.8rem;color:var(--text-2);margin-top:.4rem">${c} correctas</div>
+        </div>`;
+      }).join('');
+
+    // Tiempo
+    const mins = Math.floor(r.tiempo_usado_segundos / 60);
+    const segs = r.tiempo_usado_segundos % 60;
+    document.getElementById('tiempo-usado').textContent  = `${mins}m ${segs}s`;
+    document.getElementById('seg-por-preg').textContent  = r.total_preguntas ? (r.tiempo_usado_segundos / r.total_preguntas).toFixed(1) + 's' : '—';
+    const totalCorr = mids.reduce((s, m) => s + (r[`correctas_${m}`] || 0), 0);
+    document.getElementById('total-correctas').textContent = `${totalCorr} / ${r.total_preguntas}`;
+
+    // Revision
+    renderRevision(r.respuestas_detalle, 'todas');
+  }
+
+  function renderRevision(detalle, filtro) {
+    const marcadas = JSON.parse(localStorage.getItem('simulacro_marcadas') || '[]');
+    let items = detalle;
+    if (filtro === 'correctas')   items = detalle.filter(d => d.correcta);
+    if (filtro === 'incorrectas') items = detalle.filter(d => !d.correcta);
+    if (filtro === 'marcadas')    items = detalle.filter(d => marcadas.includes(d.id));
+
+    document.getElementById('review-list').innerHTML = items.map(d => {
+      const nivNombre = ['','Basico','Intermedio','Avanzado'][d.nivel] || '';
+      const opciones  = d.opciones.map((op, i) => {
+        const esUsuario   = i === d.respuesta_usuario;
+        const esCorrecta  = i === d.respuesta_correcta;
+        let cls = '';
+        if (esCorrecta && esUsuario) cls = 'correcta-usuario';
+        else if (esCorrecta)         cls = 'correcta';
+        else if (esUsuario)          cls = 'usuario';
+        return `<div class="review-opcion ${cls}">
+          <strong>${LETRAS[i]}.</strong> ${op}
+          ${esCorrecta && esUsuario ? ' ✅' : esCorrecta ? ' ✅' : esUsuario ? ' ❌' : ''}
+        </div>`;
+      }).join('');
+
+      return `<div class="review-item ${d.correcta ? 'correct' : 'incorrect'}">
+        <div class="review-meta">
+          <span class="badge badge-${d.correcta ? 'success' : 'danger'}">${d.correcta ? '✅ Correcta' : '❌ Incorrecta'}</span>
+          <span class="badge badge-primary">${d.modulo}</span>
+          <span class="badge">${nivNombre}</span>
+          <span style="font-size:.8rem;color:var(--text-2)">${d.id}</span>
+        </div>
+        <div class="review-pregunta">${d.pregunta}</div>
+        <div class="review-opciones">${opciones}</div>
+        ${d.explicacion ? `<div class="review-explicacion"><strong>Explicacion:</strong> ${d.explicacion}</div>` : ''}
+      </div>`;
+    }).join('') || '<p style="color:var(--text-2);padding:1rem">No hay preguntas con este filtro.</p>';
+  }
+
+  function filtrar(tipo, btn) {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    if (resultadoActual) renderRevision(resultadoActual.respuestas_detalle, tipo);
+  }
+
+  function descargarPDF() {
+    if (!resultadoActual) return;
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const r = resultadoActual;
+    const u = obtenerUsuarioActual();
+
+    doc.setFontSize(20); doc.setFont(undefined,'bold');
+    doc.text('Simulacro Saber TyT — Resultados', 20, 25);
+
+    doc.setFontSize(11); doc.setFont(undefined,'normal');
+    doc.text(`Estudiante: ${u.nombre}`, 20, 38);
+    doc.text(`Fecha: ${new Date().toLocaleDateString('es-CO')}`, 20, 45);
+    doc.text(`Puntaje total: ${r.puntaje_total} / 300`, 20, 52);
+    doc.text(`Preguntas correctas: ${Object.values({LC:r.correctas_LC,RQ:r.correctas_RQ,CE:r.correctas_CE,CC:r.correctas_CC,IN:r.correctas_IN,TE:r.correctas_TE}).reduce((a,b)=>a+b,0)} / ${r.total_preguntas}`, 20, 59);
+
+    let y = 72;
+    doc.setFont(undefined,'bold'); doc.text('Puntaje por modulo:', 20, y); y += 8;
+    doc.setFont(undefined,'normal');
+    const mids = ['LC','RQ','CE','CC','IN','TE'];
+    for (const m of mids) {
+      if (r[`puntaje_${m}`] > 0) {
+        doc.text(`  ${NOMBRES_MODULO[m]}: ${r[`puntaje_${m}`]}/300 (${r[`correctas_${m}`]} correctas)`, 20, y);
+        y += 7;
+      }
+    }
+
+    y += 5; doc.setFont(undefined,'bold'); doc.text('Preguntas incorrectas:', 20, y); y += 8;
+    doc.setFont(undefined,'normal');
+    const incorrectas = (r.respuestas_detalle || []).filter(d => !d.correcta);
+    for (const d of incorrectas.slice(0, 30)) {
+      if (y > 270) { doc.addPage(); y = 20; }
+      const lines = doc.splitTextToSize(`• [${d.id}] ${d.pregunta}`, 170);
+      doc.text(lines, 20, y); y += lines.length * 5 + 2;
+      if (d.explicacion) {
+        const expLines = doc.splitTextToSize(`  Resp.: ${d.explicacion}`, 165);
+        doc.setTextColor(100); doc.text(expLines, 22, y); doc.setTextColor(0);
+        y += expLines.length * 5 + 3;
+      }
+    }
+
+    doc.save(`Simulacro_SaberTyT_${new Date().toISOString().substring(0,10)}.pdf`);
+  }
+</script>
+</body>
+</html>

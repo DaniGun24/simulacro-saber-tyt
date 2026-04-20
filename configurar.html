@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Configurar simulacro — Saber TyT</title>
+  <link rel="stylesheet" href="css/main.css">
+  <style>
+    .config-layout { max-width: 700px; margin: 0 auto; padding: 2rem 1.5rem; }
+    .config-title { font-size: 1.5rem; font-weight: 800; margin-bottom: .25rem; }
+    .config-sub   { color: var(--text-2); font-size: .9rem; margin-bottom: 2rem; }
+
+    .main-param { background: var(--surface); border: 2px solid var(--primary); border-radius: var(--radius); padding: 1.5rem 2rem; margin-bottom: 1.5rem; }
+    .main-param h2 { font-size: 1rem; font-weight: 700; margin-bottom: 1rem; }
+
+    .qty-control { display: flex; align-items: center; gap: 1rem; }
+    .qty-control input[type=number] {
+      width: 100px; padding: .65rem; font-size: 1.5rem; font-weight: 800;
+      text-align: center; border: 2px solid var(--border); border-radius: var(--radius);
+    }
+    .qty-btn {
+      width: 44px; height: 44px; border: 2px solid var(--border); border-radius: 50%;
+      background: var(--surface); font-size: 1.4rem; font-weight: 700; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; transition: .15s;
+    }
+    .qty-btn:hover { border-color: var(--primary); color: var(--primary); }
+
+    .time-display {
+      background: var(--bg); border-radius: var(--radius); padding: 1rem 1.5rem;
+      margin-top: 1rem; display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: .5rem;
+    }
+    .time-display .time-val { font-size: 1.8rem; font-weight: 800; font-family: monospace; color: var(--primary); }
+    .time-display .time-lbl { font-size: .85rem; color: var(--text-2); }
+
+    .advanced-toggle {
+      display: flex; align-items: center; gap: .5rem; cursor: pointer;
+      color: var(--primary); font-weight: 600; font-size: .9rem;
+      border: none; background: none; padding: 0; margin-bottom: 1rem;
+    }
+    .advanced-toggle .chevron { transition: transform .2s; }
+    .advanced-toggle.open .chevron { transform: rotate(180deg); }
+
+    .advanced-panel { display: none; }
+    .advanced-panel.open { display: block; }
+
+    .checkbox-list { display: flex; flex-direction: column; gap: .5rem; }
+    .checkbox-item {
+      display: flex; align-items: center; gap: .75rem; padding: .65rem .9rem;
+      border: 1.5px solid var(--border); border-radius: var(--radius); cursor: pointer;
+      transition: .15s;
+    }
+    .checkbox-item:hover { border-color: var(--primary); }
+    .checkbox-item input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--primary); cursor: pointer; }
+    .checkbox-item label { cursor: pointer; flex: 1; font-size: .95rem; }
+    .checkbox-item .mod-count { font-size: .8rem; color: var(--text-2); }
+
+    .rules-accordion { margin-top: 1.5rem; }
+    .rules-item { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: .5rem; }
+    .rules-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: .75rem 1rem; background: var(--bg); cursor: pointer; font-weight: 600; font-size: .93rem;
+    }
+    .rules-header:hover { background: #eff6ff; }
+    .rules-body { display: none; padding: .75rem 1rem; background: var(--surface); }
+    .rules-body.open { display: block; }
+    .rules-body ul { list-style: none; display: flex; flex-direction: column; gap: .4rem; }
+    .rules-body li { display: flex; gap: .5rem; font-size: .9rem; }
+    .rules-body li::before { content: '•'; color: var(--primary); flex-shrink: 0; }
+
+    .radio-group { display: flex; flex-direction: column; gap: .5rem; }
+    .radio-item { display: flex; align-items: center; gap: .75rem; font-size: .95rem; }
+    .radio-item input { width: 18px; height: 18px; accent-color: var(--primary); cursor: pointer; }
+  </style>
+</head>
+<body>
+
+<header class="app-header">
+  <a href="dashboard.html" class="btn btn-ghost btn-sm">← Dashboard</a>
+  <span class="app-logo">📋 Saber TyT</span>
+  <div class="app-header-spacer"></div>
+  <span id="header-user" style="font-size:.9rem;color:var(--text-2)"></span>
+</header>
+
+<main class="config-layout">
+  <h1 class="config-title" id="config-title">Configurar simulacro</h1>
+  <p class="config-sub" id="config-sub">Ajusta los parametros antes de comenzar. El simulacro oficial tiene 50 preguntas por modulo.</p>
+
+  <!-- Modo practica banner -->
+  <div id="modo-practica-banner" class="alert alert-info mb-2 hidden">
+    ✏️ <strong>Modo practica:</strong> Sin temporizador. Se muestra la respuesta correcta inmediatamente. No se guarda como simulacro oficial.
+  </div>
+
+  <!-- Parametro principal: preguntas por modulo -->
+  <div class="main-param">
+    <h2>Preguntas por modulo</h2>
+    <div class="qty-control">
+      <button class="qty-btn" onclick="cambiarCantidad(-5)">−</button>
+      <input type="number" id="qty-preguntas" value="50" min="5" max="200" onchange="actualizarTiempo()">
+      <button class="qty-btn" onclick="cambiarCantidad(+5)">+</button>
+      <div style="font-size:.85rem;color:var(--text-2);line-height:1.4">
+        <div id="total-preguntas-info"><strong>300 preguntas</strong> en total</div>
+        <div>(6 modulos × 50)</div>
+      </div>
+    </div>
+
+    <div class="time-display">
+      <div>
+        <div class="time-lbl">Tiempo estimado</div>
+        <div class="time-val" id="tiempo-display">04:40:00</div>
+      </div>
+      <div style="font-size:.85rem;color:var(--text-2);text-align:right">
+        <div>Genericos: <span id="t-genericos">280 min</span></div>
+        <div>Especifico: <span id="t-especifico">90 min</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Configuracion avanzada -->
+  <button class="advanced-toggle" id="advanced-toggle" onclick="toggleAvanzado()">
+    <span class="chevron">▼</span> Configuracion avanzada
+  </button>
+
+  <div class="advanced-panel" id="advanced-panel">
+    <div class="card mb-2">
+      <div class="card-title">Modulos a incluir</div>
+      <div class="checkbox-list" id="modulos-list"></div>
+    </div>
+
+    <div class="card mb-2">
+      <div class="card-title">Modo de revision</div>
+      <div class="radio-group">
+        <label class="radio-item">
+          <input type="radio" name="revision" value="final" checked> Al final de todo el simulacro (como el ICFES real)
+        </label>
+        <label class="radio-item">
+          <input type="radio" name="revision" value="modulo"> Al terminar cada modulo
+        </label>
+      </div>
+    </div>
+
+    <div class="card mb-2">
+      <div class="card-title">Mostrar respuesta correcta al avanzar</div>
+      <div class="radio-group">
+        <label class="radio-item">
+          <input type="radio" name="mostrar-resp" value="no" checked> No (simula el ICFES real)
+        </label>
+        <label class="radio-item">
+          <input type="radio" name="mostrar-resp" value="si"> Si (util para estudiar)
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reglas por modulo (accordion) -->
+  <div class="rules-accordion">
+    <p style="font-weight:700;margin-bottom:.75rem">Reglas oficiales ICFES por modulo:</p>
+    <div id="rules-list"></div>
+  </div>
+
+  <!-- Boton iniciar -->
+  <div style="margin-top:2rem;display:flex;gap:1rem;flex-wrap:wrap">
+    <button class="btn btn-primary btn-lg" onclick="iniciarSimulacro()" id="btn-iniciar">
+      ▶ Comenzar simulacro
+    </button>
+    <a href="dashboard.html" class="btn btn-outline btn-lg">Cancelar</a>
+  </div>
+</main>
+
+<div class="toast-container" id="toast-container"></div>
+
+<script src="js/config.js"></script>
+<script src="js/sheets.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/banco.js"></script>
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const esPractica = params.get('modo') === 'practica';
+
+  window.addEventListener('DOMContentLoaded', () => {
+    if (!verificarSesion()) return;
+    const u = obtenerUsuarioActual();
+    document.getElementById('header-user').textContent = u.nombre;
+
+    if (esPractica) {
+      document.getElementById('config-title').textContent = 'Modo Practica';
+      document.getElementById('config-sub').textContent = 'Practica sin temporizador. Puedes ver la respuesta correcta inmediatamente.';
+      document.getElementById('modo-practica-banner').classList.remove('hidden');
+      document.getElementById('btn-iniciar').textContent = '✏️ Comenzar practica';
+    }
+
+    renderModulosCheckboxes();
+    renderReglas();
+    actualizarTiempo();
+  });
+
+  function renderModulosCheckboxes() {
+    const lista = document.getElementById('modulos-list');
+    lista.innerHTML = MODULOS.map(m => `
+      <div class="checkbox-item">
+        <input type="checkbox" id="mod-${m.id}" value="${m.key}" checked onchange="actualizarTiempo()">
+        <label for="mod-${m.id}">${m.nombre}</label>
+        <span class="mod-count">${m.max} pregs. disponibles</span>
+      </div>
+    `).join('');
+  }
+
+  function renderReglas() {
+    const cont = document.getElementById('rules-list');
+    cont.innerHTML = MODULOS.map((m, i) => {
+      const reglas = REGLAS_MODULOS[m.key] || [];
+      return `
+        <div class="rules-item">
+          <div class="rules-header" onclick="toggleRegla(this)">
+            <span>${m.nombre}</span><span>▼</span>
+          </div>
+          <div class="rules-body ${i === 0 ? 'open' : ''}">
+            <ul>${reglas.map(r => `<li>${r}</li>`).join('')}</ul>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  function toggleRegla(header) {
+    const body = header.nextElementSibling;
+    body.classList.toggle('open');
+  }
+
+  function toggleAvanzado() {
+    const toggle = document.getElementById('advanced-toggle');
+    const panel  = document.getElementById('advanced-panel');
+    toggle.classList.toggle('open');
+    panel.classList.toggle('open');
+  }
+
+  function cambiarCantidad(delta) {
+    const input = document.getElementById('qty-preguntas');
+    const nuevo = Math.max(5, Math.min(200, parseInt(input.value) + delta));
+    input.value = nuevo;
+    actualizarTiempo();
+  }
+
+  function getModulosSeleccionados() {
+    return MODULOS
+      .map(m => document.getElementById(`mod-${m.id}`))
+      .filter(cb => cb && cb.checked)
+      .map(cb => cb.value);
+  }
+
+  function actualizarTiempo() {
+    const ppm     = parseInt(document.getElementById('qty-preguntas').value) || 50;
+    const modulos = getModulosSeleccionados();
+
+    // Cap por modulo
+    const cappedPpm = MODULOS.reduce((acc, m) => {
+      if (modulos.includes(m.key)) acc[m.key] = Math.min(ppm, m.max);
+      return acc;
+    }, {});
+
+    const esEsp = key => key === 'Telecomunicaciones Especifico';
+    const genericos  = modulos.filter(m => !esEsp(m));
+    const especifico = modulos.find(esEsp);
+
+    const totalGen = genericos.reduce((s, m) => s + (cappedPpm[m] || 0), 0);
+    const minGen   = (totalGen / 300) * 280;
+    const pregEsp  = especifico ? (cappedPpm[especifico] || 0) : 0;
+    const minEsp   = especifico ? (pregEsp / 50) * 90 : 0;
+
+    const totalMin = minGen + minEsp;
+    const totalSeg = Math.round(totalMin * 60);
+    const h = Math.floor(totalSeg / 3600);
+    const m = Math.floor((totalSeg % 3600) / 60);
+    const s = totalSeg % 60;
+
+    document.getElementById('tiempo-display').textContent =
+      `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    document.getElementById('t-genericos').textContent  = Math.round(minGen)  + ' min';
+    document.getElementById('t-especifico').textContent = Math.round(minEsp)  + ' min';
+
+    const totalPregs = modulos.reduce((s, mk) => s + (cappedPpm[mk] || 0), 0);
+    document.getElementById('total-preguntas-info').innerHTML =
+      `<strong>${totalPregs} preguntas</strong> en total`;
+  }
+
+  function iniciarSimulacro() {
+    const ppm     = parseInt(document.getElementById('qty-preguntas').value) || 50;
+    const modulos = getModulosSeleccionados();
+    if (!modulos.length) { alert('Selecciona al menos un modulo.'); return; }
+
+    const revision    = document.querySelector('input[name="revision"]:checked').value;
+    const mostrarResp = document.querySelector('input[name="mostrar-resp"]:checked').value;
+
+    const config = {
+      preguntasPorModulo: ppm,
+      modulos,
+      modoRevision:  revision,
+      mostrarRespuesta: mostrarResp === 'si',
+      modoPractica:  esPractica,
+    };
+
+    localStorage.setItem('simulacro_config', JSON.stringify(config));
+    window.location.href = 'simulacro.html';
+  }
+</script>
+</body>
+</html>

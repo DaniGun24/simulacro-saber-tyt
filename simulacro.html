@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulacro — Saber TyT</title>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/simulacro.css">
+</head>
+<body>
+
+<!-- Header fijo del simulacro -->
+<header class="sim-header">
+  <span class="app-logo" style="font-size:.95rem">📋 Saber TyT</span>
+  <span id="header-modulo" style="font-size:.88rem;color:var(--text-2);flex:1;padding:0 .5rem"></span>
+  <div id="timer-display" class="timer-display">00:00:00</div>
+  <button class="btn btn-warning btn-sm" id="btn-pausar" onclick="accionPausar()">⏸ Pausar</button>
+  <button class="btn btn-ghost btn-sm" id="btn-sidebar-toggle" onclick="toggleSidebar()">☰</button>
+</header>
+
+<!-- Layout -->
+<div class="sim-layout" id="sim-layout">
+
+  <!-- Sidebar -->
+  <aside class="sim-sidebar" id="sim-sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-title">Modulos</div>
+      <ul class="module-list" id="module-list"></ul>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-title">Preguntas del modulo actual</div>
+      <div class="question-map" id="question-map"></div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="sim-main" id="sim-main">
+
+    <!-- Barra de progreso dual -->
+    <div class="progress-double">
+      <div>
+        <div class="progress-label">
+          <span id="prog-modulo-label">Modulo 1 de 1</span>
+          <span id="prog-modulo-pct">0%</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="prog-modulo-fill" style="width:0%"></div></div>
+      </div>
+      <div>
+        <div class="progress-label">
+          <span>Progreso total</span>
+          <span id="prog-total-pct">0%</span>
+        </div>
+        <div class="progress-bar" style="height:5px"><div class="progress-fill" id="prog-total-fill" style="width:0%;background:var(--success)"></div></div>
+      </div>
+    </div>
+
+    <!-- Encabezado del modulo -->
+    <div class="sim-module-header">
+      <div>
+        <div class="sim-module-name" id="modulo-nombre"></div>
+        <div class="sim-module-info" id="modulo-info"></div>
+      </div>
+    </div>
+
+    <!-- Tarjeta de pregunta -->
+    <div class="question-card" id="question-card">
+      <div class="question-meta">
+        <span class="question-number" id="q-number"></span>
+        <span class="question-level" id="q-level"></span>
+      </div>
+      <div class="question-text" id="q-text"></div>
+      <ul class="options-list" id="options-list"></ul>
+      <!-- Explicacion (solo modo practica) -->
+      <div class="explanation-box hidden" id="explanation-box">
+        <strong>Explicacion:</strong> <span id="explanation-text"></span>
+      </div>
+    </div>
+
+    <!-- Navegacion -->
+    <div class="sim-nav">
+      <div class="sim-nav-left">
+        <button class="btn btn-outline btn-sm" id="btn-anterior" onclick="navegarAnterior()">← Anterior</button>
+        <button class="btn btn-outline btn-sm" id="btn-siguiente" onclick="navegarSiguiente()">Siguiente →</button>
+        <button class="btn btn-ghost btn-sm" id="btn-marcar" onclick="accionMarcar()" title="Marcar para revision">🚩 Marcar</button>
+      </div>
+      <div class="sim-nav-right">
+        <button class="btn btn-danger btn-sm" onclick="confirmarTerminarModulo()">Terminar modulo</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Pantalla de REGLAS (antes de cada modulo) -->
+<div class="rules-screen" id="rules-screen">
+  <div class="rules-card card">
+    <h2 id="rules-modulo-nombre">Lectura Critica</h2>
+    <p style="color:var(--text-2);font-size:.88rem;margin-bottom:1rem">Lee atentamente las reglas antes de comenzar:</p>
+    <ul class="rules-list" id="rules-list"></ul>
+    <button class="btn btn-primary w-full btn-lg" onclick="cerrarReglas()">Entendido, comenzar</button>
+    <p class="rules-countdown" id="rules-countdown"></p>
+  </div>
+</div>
+
+<!-- Pantalla de PAUSA -->
+<div class="pause-screen hidden" id="pause-screen">
+  <div class="pause-card card">
+    <h2>⏸ Simulacro pausado</h2>
+    <p style="color:var(--text-2);font-size:.9rem">Las preguntas estan ocultas para preservar tu privacidad.</p>
+    <div class="pause-stats">
+      <div class="pause-stat">
+        <div class="val" id="pause-tiempo"></div>
+        <div class="lbl">Tiempo restante</div>
+      </div>
+      <div class="pause-stat">
+        <div class="val" id="pause-respondidas"></div>
+        <div class="lbl">Respondidas</div>
+      </div>
+      <div class="pause-stat">
+        <div class="val" id="pause-total"></div>
+        <div class="lbl">Total preguntas</div>
+      </div>
+      <div class="pause-stat">
+        <div class="val" id="pause-avance"></div>
+        <div class="lbl">% de avance</div>
+      </div>
+    </div>
+    <button class="btn btn-primary w-full btn-lg" onclick="accionReanudar()">▶ Continuar</button>
+    <button class="btn btn-ghost w-full btn-sm mt-1" onclick="abandonarSimulacro()">Abandonar simulacro</button>
+  </div>
+</div>
+
+<!-- Modal confirmar terminar modulo -->
+<div class="modal-overlay hidden" id="modal-terminar">
+  <div class="modal">
+    <div class="modal-title">¿Terminar modulo?</div>
+    <p id="modal-terminar-msg" style="font-size:.9rem;color:var(--text-2)"></p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="cerrarModalTerminar()">Cancelar</button>
+      <button class="btn btn-danger" onclick="terminarModulo()">Terminar de todas formas</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+
+<script src="js/config.js"></script>
+<script src="js/sheets.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/banco.js"></script>
+<script src="js/timer.js"></script>
+<script src="js/simulacro.js"></script>
+<script>
+  let configSimulacro = null;
+  let tiempoInicial   = 0;
+  let reglasCuentaAtras = null;
+
+  let gapiReady = false, gisReady = false;
+  function gapiLoaded() { gapiReady = true; tryInitSheets(); }
+  function gisLoaded()  { gisReady  = true; tryInitSheets(); }
+  async function tryInitSheets() {
+    if (!gapiReady || !gisReady) return;
+    await Sheets.inicializar();
+  }
+
+  window.addEventListener('DOMContentLoaded', async () => {
+    if (!verificarSesion()) return;
+
+    // Leer config guardada
+    const rawConfig = localStorage.getItem('simulacro_config');
+    if (!rawConfig) { window.location.href = 'configurar.html'; return; }
+    configSimulacro = JSON.parse(rawConfig);
+
+    // Cargar banco
+    try {
+      await Banco.cargar();
+    } catch (e) {
+      alert('Error al cargar el banco de preguntas: ' + e.message);
+      return;
+    }
+
+    // Verificar si hay sesion a continuar
+    const sesionId = localStorage.getItem('sesion_continuar');
+    if (sesionId) {
+      localStorage.removeItem('sesion_continuar');
+      // Por ahora iniciamos con nueva config (restauracion completa requiere Sheets autenticado)
+    }
+
+    // Seleccionar preguntas
+    const preguntas = Banco.seleccionarPreguntas(configSimulacro.modulos, configSimulacro.preguntasPorModulo);
+    const { totalSegundos } = Banco.calcularTiempo(configSimulacro.modulos, configSimulacro.preguntasPorModulo);
+    tiempoInicial = configSimulacro.modoPractica ? Infinity : totalSegundos;
+
+    await Simulacro.iniciar(configSimulacro, preguntas, totalSegundos);
+
+    // Mostrar reglas del primer modulo
+    mostrarReglas();
+  });
+
+  // ---- Reglas ----
+  function mostrarReglas() {
+    const mk = Simulacro.moduloActual();
+    document.getElementById('rules-modulo-nombre').textContent = mk;
+    const reglas = REGLAS_MODULOS[mk] || [];
+    document.getElementById('rules-list').innerHTML = reglas.map(r => `<li>${r}</li>`).join('');
+    document.getElementById('rules-screen').style.display = 'flex';
+
+    let seg = 5;
+    document.getElementById('rules-countdown').textContent = `Avanzara automaticamente en ${seg}s`;
+    reglasCuentaAtras = setInterval(() => {
+      seg--;
+      if (seg <= 0) { clearInterval(reglasCuentaAtras); cerrarReglas(); }
+      else document.getElementById('rules-countdown').textContent = `Avanzara automaticamente en ${seg}s`;
+    }, 1000);
+  }
+
+  function cerrarReglas() {
+    clearInterval(reglasCuentaAtras);
+    document.getElementById('rules-screen').style.display = 'none';
+    iniciarTimerModulo();
+    renderUI();
+  }
+
+  // ---- Timer ----
+  function iniciarTimerModulo() {
+    if (configSimulacro.modoPractica) { document.getElementById('timer-display').textContent = '∞'; return; }
+    const seg = Banco.calcularTiempoPorModulo(Simulacro.moduloActual(), configSimulacro.preguntasPorModulo);
+    Timer.iniciar(seg,
+      (restantes, fmt) => {
+        const el = document.getElementById('timer-display');
+        el.textContent = fmt;
+        el.className = 'timer-display' + (restantes <= 60 ? ' danger' : restantes <= 300 ? ' warning' : '');
+      },
+      () => {
+        toast('Tiempo agotado para este modulo', 'error');
+        terminarModulo(true);
+      }
+    );
+  }
+
+  // ---- Render UI ----
+  function renderUI() {
+    const est   = Simulacro.estado;
+    const mods  = est.config.modulos;
+    const mk    = Simulacro.moduloActual();
+    const pregs = Simulacro.preguntasModulo();
+    const pq    = Simulacro.preguntaActual();
+    if (!pq) return;
+
+    // Header
+    document.getElementById('header-modulo').textContent = `Modulo ${est.moduloIdx + 1} de ${mods.length}: ${mk}`;
+    document.getElementById('modulo-nombre').textContent = mk;
+    document.getElementById('modulo-info').textContent   = `Pregunta ${est.preguntaIdx + 1} de ${pregs.length}`;
+
+    // Progreso modulo
+    const pctMod = Math.round((est.preguntaIdx + 1) / pregs.length * 100);
+    document.getElementById('prog-modulo-label').textContent = `Modulo ${est.moduloIdx + 1} de ${mods.length}`;
+    document.getElementById('prog-modulo-pct').textContent   = pctMod + '%';
+    document.getElementById('prog-modulo-fill').style.width  = pctMod + '%';
+
+    // Progreso total
+    const respondidas = Simulacro.preguntasRespondidas();
+    const total       = Simulacro.totalPreguntas();
+    const pctTot      = Math.round(respondidas / total * 100);
+    document.getElementById('prog-total-pct').textContent  = pctTot + '%';
+    document.getElementById('prog-total-fill').style.width = pctTot + '%';
+
+    // Pregunta
+    document.getElementById('q-number').textContent = `Pregunta ${est.preguntaIdx + 1}`;
+    const lvlEl = document.getElementById('q-level');
+    lvlEl.textContent = ['', 'Basico', 'Intermedio', 'Avanzado'][pq.nivel] || '';
+    lvlEl.className = `question-level level-${pq.nivel}`;
+    document.getElementById('q-text').textContent = pq.pregunta;
+
+    // Opciones
+    const letras = ['A','B','C','D'];
+    const respGuardada = est.respuestas[pq.id];
+    const mostrarResp = est.config.mostrarRespuesta && respGuardada !== undefined;
+    document.getElementById('options-list').innerHTML = pq.opciones.map((op, i) => {
+      let cls = 'option-btn';
+      if (mostrarResp) {
+        if (i === pq.respuesta)      cls += ' correct';
+        else if (i === respGuardada) cls += ' wrong';
+      } else if (i === respGuardada) {
+        cls += ' selected';
+      }
+      return `<li>
+        <button class="${cls}" onclick="seleccionarOpcion(${i})" data-idx="${i}">
+          <span class="option-letter">${letras[i]}</span>
+          <span>${op}</span>
+        </button>
+      </li>`;
+    }).join('');
+
+    // Explicacion (modo practica)
+    if (est.config.modoPractica && respGuardada !== undefined) {
+      document.getElementById('explanation-box').classList.remove('hidden');
+      document.getElementById('explanation-text').textContent = pq.explicacion || '';
+    } else {
+      document.getElementById('explanation-box').classList.add('hidden');
+    }
+
+    // Botones nav
+    document.getElementById('btn-anterior').disabled  = est.preguntaIdx === 0;
+    document.getElementById('btn-siguiente').disabled = est.preguntaIdx === pregs.length - 1;
+    const marcado = est.marcadas.has(pq.id);
+    document.getElementById('btn-marcar').style.color = marcado ? 'var(--warning)' : '';
+
+    // Sidebar
+    renderSidebar();
+  }
+
+  function renderSidebar() {
+    const est  = Simulacro.estado;
+    const mods = est.config.modulos;
+
+    // Lista modulos
+    document.getElementById('module-list').innerHTML = mods.map((mk, i) => {
+      const done = i < est.moduloIdx;
+      const curr = i === est.moduloIdx;
+      return `<li class="module-item ${done ? 'completed' : curr ? 'active' : 'pending'}">
+        <span class="module-icon">${done ? '✅' : curr ? '▶' : '○'}</span>
+        <span>${mk}</span>
+      </li>`;
+    }).join('');
+
+    // Mapa preguntas
+    const pregs = Simulacro.preguntasModulo();
+    document.getElementById('question-map').innerHTML = pregs.map((p, i) => {
+      const respondida = est.respuestas[p.id] !== undefined;
+      const marcada    = est.marcadas.has(p.id);
+      const actual     = i === est.preguntaIdx;
+      let cls = 'q-btn ' + (marcada ? 'flagged' : respondida ? 'answered' : 'unanswered');
+      if (actual) cls += ' current';
+      return `<button class="${cls}" onclick="irAPregunta(${i})" title="Pregunta ${i+1}">${i+1}</button>`;
+    }).join('');
+  }
+
+  // ---- Acciones ----
+  function seleccionarOpcion(idx) {
+    const pq = Simulacro.preguntaActual();
+    if (!pq) return;
+    Simulacro.responder(pq.id, idx);
+    renderUI();
+  }
+
+  function navegarAnterior() { Simulacro.anteriorPregunta(); renderUI(); }
+  function navegarSiguiente() { Simulacro.siguientePregunta(); renderUI(); }
+  function irAPregunta(idx) { Simulacro.irAPregunta(idx); renderUI(); }
+
+  function accionMarcar() {
+    const pq = Simulacro.preguntaActual();
+    if (pq) { Simulacro.toggleMarca(pq.id); renderUI(); }
+  }
+
+  function accionPausar() {
+    Simulacro.pausar();
+    const est = Simulacro.estado;
+    const restantes = Timer.obtenerRestantes();
+    document.getElementById('pause-tiempo').textContent      = Timer.formatear(restantes);
+    document.getElementById('pause-respondidas').textContent = Simulacro.preguntasRespondidas();
+    document.getElementById('pause-total').textContent       = Simulacro.totalPreguntas();
+    document.getElementById('pause-avance').textContent      = Math.round(Simulacro.preguntasRespondidas() / Simulacro.totalPreguntas() * 100) + '%';
+    document.getElementById('pause-screen').classList.remove('hidden');
+  }
+
+  function accionReanudar() {
+    Simulacro.reanudar();
+    document.getElementById('pause-screen').classList.add('hidden');
+  }
+
+  function confirmarTerminarModulo() {
+    const pregs = Simulacro.preguntasModulo();
+    const est   = Simulacro.estado;
+    const sinResp = pregs.filter(p => est.respuestas[p.id] === undefined).length;
+    const msg = sinResp > 0
+      ? `Tienes ${sinResp} pregunta(s) sin responder en este modulo. ¿Deseas terminar de todas formas?`
+      : '¿Estas seguro de que deseas terminar este modulo?';
+    document.getElementById('modal-terminar-msg').textContent = msg;
+    document.getElementById('modal-terminar').classList.remove('hidden');
+  }
+
+  function cerrarModalTerminar() {
+    document.getElementById('modal-terminar').classList.add('hidden');
+  }
+
+  async function terminarModulo(porTiempo = false) {
+    cerrarModalTerminar();
+    Timer.detener();
+    const hayMas = Simulacro.siguienteModulo();
+    if (hayMas) {
+      mostrarReglas();
+    } else {
+      await finalizarSimulacro();
+    }
+  }
+
+  async function finalizarSimulacro() {
+    const tiempoUsado = tiempoInicial - Timer.obtenerRestantes();
+    try { await Sheets.autenticar(); } catch(_) {}
+    const resultado = await Simulacro.finalizarYGuardar(tiempoUsado);
+    window.location.href = `resultados.html?nuevo=1`;
+  }
+
+  function abandonarSimulacro() {
+    if (confirm('¿Abandonar el simulacro? Perderás el progreso de este intento.')) {
+      Timer.detener();
+      localStorage.removeItem('simulacro_estado');
+      window.location.href = 'dashboard.html';
+    }
+  }
+
+  function toggleSidebar() {
+    document.getElementById('sim-sidebar').classList.toggle('collapsed');
+  }
+
+  function toast(msg, tipo = '') {
+    const c = document.getElementById('toast-container');
+    const t = document.createElement('div');
+    t.className = `toast ${tipo}`;
+    t.textContent = msg;
+    c.appendChild(t);
+    setTimeout(() => t.remove(), 3500);
+  }
+
+  // Teclado: izq/der para navegar, Enter para seleccionar opcion focalizada
+  document.addEventListener('keydown', e => {
+    if (document.getElementById('pause-screen').classList.contains('hidden') === false) return;
+    if (e.key === 'ArrowLeft')  navegarAnterior();
+    if (e.key === 'ArrowRight') navegarSiguiente();
+  });
+</script>
+<script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+<script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
+</body>
+</html>

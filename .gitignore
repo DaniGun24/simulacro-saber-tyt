@@ -1,0 +1,13 @@
+# No subir credenciales reales si las editas directamente en config.js
+# Descomenta la siguiente linea si guardas las keys en config.js:
+# js/config.js
+
+# Sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editores
+.vscode/
+.idea/
+*.swp
